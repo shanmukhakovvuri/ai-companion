@@ -12,6 +12,7 @@ export default function CameraPanel({
   onStatusChange,
   onDescribe,
   isDescribing = false,
+  statusText = '',
 }) {
   const [selectedFile, setSelectedFile] = useState(null);
   const [previewUrl, setPreviewUrl] = useState(null);
@@ -249,7 +250,7 @@ export default function CameraPanel({
           </button>
           <span id="describe-explanation" className="action-help-text">
             {isDescribing
-              ? 'Analyzing image with local AI...'
+              ? (statusText || 'Analyzing image with local AI...')
               : (hasImage
                   ? 'Describe this photo using local AI.'
                   : 'Select or take a photo first to enable AI description.')}

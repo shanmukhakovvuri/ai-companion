@@ -172,6 +172,7 @@ export default function App() {
             onStatusChange={handleStatusChange}
             onDescribe={handleDescribeImage}
             isDescribing={isDescribing}
+            statusText={status}
           />
 
           {/* 3. Conversation Panel Section (DOM Order: Third in main) */}
