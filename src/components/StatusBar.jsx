@@ -26,6 +26,7 @@ export default function StatusBar({ status = 'Voice input is not available yet.'
       role="status"
       aria-live="polite"
       aria-atomic="true"
+      aria-busy={isLoading}
     >
       <span className="status-bar-icon-wrap" aria-hidden="true">
         {statusType === 'ready' && (

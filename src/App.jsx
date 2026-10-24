@@ -1,12 +1,15 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import MicButton from './components/MicButton';
 import CameraPanel from './components/CameraPanel';
 import ChatPanel from './components/ChatPanel';
 import StatusBar from './components/StatusBar';
 import { loadVision, describeImage, isVisionReady } from './ai/vision';
+import { loadOcr, readText, isOcrReady } from './ai/ocr';
 import { isSpeechRecognitionSupported, startSpeechRecognition, stopSpeechRecognition } from './voice/speechInput';
-import { speakText, stopSpeaking } from './voice/speechOutput';
+import { speakText as speakSpeechOutput, stopSpeaking as stopSpeechOutput } from './voice/speechOutput';
+import { speakText, stopSpeaking, pauseSpeaking, resumeSpeaking } from './voice/speak';
 import { openAllowedSite, routeCommand } from './actions/commandRouter';
+import { isTextGroundedQuestion, answerImageQuestion } from './ai/qa';
 
 const VOICE_LANGUAGES = [
   { value: 'en-IN', label: 'English (India)' },
@@ -34,33 +37,40 @@ export default function App() {
   ));
   const [progress, setProgress] = useState(null);
   const [isDescribing, setIsDescribing] = useState(false);
+  const [isReadingText, setIsReadingText] = useState(false);
+  const [isSpeaking, setIsSpeaking] = useState(false);
+  const [isPaused, setIsPaused] = useState(false);
   const [messages, setMessages] = useState([]);
   const [selectedImage, setSelectedImage] = useState(null);
   const [selectedLanguage, setSelectedLanguage] = useState('en-IN');
   const [isListening, setIsListening] = useState(false);
   const [isProcessingVoice, setIsProcessingVoice] = useState(false);
-  const [isSpeaking, setIsSpeaking] = useState(false);
+  const currentOcrCacheRef = useRef(null);
 
   useEffect(() => () => {
     stopSpeechRecognition();
+    stopSpeechOutput();
     stopSpeaking();
   }, []);
 
-  const addMessage = (sender, text) => {
+  const addMessage = (sender, text, label) => {
     setMessages((prev) => [...prev, {
       id: `${sender}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
       sender,
       text,
+      label,
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
     }]);
   };
 
   const speakResponse = async (text, completionStatus = 'Response ready.') => {
     if (!text?.trim()) return;
+    stopSpeaking();
     setIsSpeaking(true);
+    setIsPaused(false);
     setStatus('Speaking response...');
     try {
-      const finished = await speakText(text, { lang: selectedLanguage });
+      const finished = await speakSpeechOutput(text, { lang: selectedLanguage });
       if (finished) setStatus(completionStatus);
     } catch (error) {
       setStatus(`Error: ${error.message || 'Spoken response could not be played.'}`);
@@ -75,10 +85,12 @@ export default function App() {
       setStatus('Stopping speech recognition...');
       return;
     }
-    if (isProcessingVoice || isDescribing) return;
+    if (isProcessingVoice || isDescribing || isReadingText) return;
 
+    stopSpeechOutput();
     stopSpeaking();
     setIsSpeaking(false);
+    setIsPaused(false);
     setStatus(`Starting speech recognition in ${selectedLanguage}...`);
     setIsListening(true);
 
@@ -92,12 +104,17 @@ export default function App() {
       const result = routeCommand(transcript, {
         hasImage: Boolean(selectedImage),
         visionAvailable: typeof describeImage === 'function',
-        ocrAvailable: false,
+        ocrAvailable: typeof readText === 'function',
         language: selectedLanguage,
       });
 
       if (result.action === 'describe_image' && result.status === 'ready') {
         await handleDescribeImage(selectedImage, transcript);
+        return;
+      }
+
+      if (result.action === 'read_text' && result.status === 'ready') {
+        await handleReadText(selectedImage);
         return;
       }
 
@@ -128,9 +145,14 @@ export default function App() {
   };
 
   const handleStopSpeaking = () => {
-    if (stopSpeaking()) {
-      setIsSpeaking(false);
+    const stopped = stopSpeechOutput();
+    stopSpeaking();
+    setIsSpeaking(false);
+    setIsPaused(false);
+    if (stopped) {
       setStatus('Spoken response stopped.');
+    } else {
+      setStatus('Speech stopped.');
     }
   };
 
@@ -142,10 +164,46 @@ export default function App() {
   // Image change handler from CameraPanel (stores selected File or null)
   const handleImageChange = (file) => {
     setSelectedImage(file);
+    // Invalidate OCR cache for previously selected image
+    currentOcrCacheRef.current = null;
+    // Cancel any active speech if image changes
+    stopSpeechOutput();
+    stopSpeaking();
+    setIsSpeaking(false);
+    setIsPaused(false);
   };
 
-  // Vision description handler
+  // Stop reading handler
+  const handleStopReading = () => {
+    stopSpeechOutput();
+    stopSpeaking();
+    setIsSpeaking(false);
+    setIsPaused(false);
+    setStatus('Speech stopped.');
+  };
+
+  // Pause reading handler
+  const handlePauseReading = () => {
+    pauseSpeaking();
+    setIsPaused(true);
+    setStatus('Speech paused.');
+  };
+
+  // Resume reading handler
+  const handleResumeReading = () => {
+    resumeSpeaking();
+    setIsPaused(false);
+    setStatus('Resuming speech...');
+  };
+
+  // Vision description / grounded question answering handler
   const handleDescribeImage = async (imageFile, customQuestion) => {
+    // Cancel any speech currently in progress
+    stopSpeechOutput();
+    stopSpeaking();
+    setIsSpeaking(false);
+    setIsPaused(false);
+
     const fileToProcess = imageFile || selectedImage;
     if (!fileToProcess) {
       setStatus('Please select or capture an image first.');
@@ -162,7 +220,47 @@ export default function App() {
     addMessage('user', questionText);
 
     try {
-      // Lazy-load model if not already loaded into worker
+      // 1. Grounded OCR Check for document text queries (phone numbers, names, addresses)
+      if (isTextGroundedQuestion(questionText)) {
+        let ocrText = '';
+        if (currentOcrCacheRef.current && currentOcrCacheRef.current.file === fileToProcess) {
+          ocrText = currentOcrCacheRef.current.text;
+        } else {
+          setStatus('Reading document text to answer your question...');
+          if (!isOcrReady()) {
+            await loadOcr();
+          }
+          const ocrRes = await readText(fileToProcess);
+          ocrText = ocrRes.text;
+          currentOcrCacheRef.current = { file: fileToProcess, text: ocrRes.text, confidence: ocrRes.confidence };
+        }
+
+        const groundedAnswer = answerImageQuestion(questionText, ocrText);
+        if (groundedAnswer) {
+          setStatus('Text ready');
+          setIsDescribing(false);
+
+          addMessage('assistant', groundedAnswer);
+
+          speakText(groundedAnswer, {
+            onStart: () => {
+              setIsSpeaking(true);
+              setIsPaused(false);
+            },
+            onEnd: () => {
+              setIsSpeaking(false);
+              setIsPaused(false);
+            },
+            onError: () => {
+              setIsSpeaking(false);
+              setIsPaused(false);
+            },
+          });
+          return;
+        }
+      }
+
+      // 2. Visual scene reasoning: Use local vision model
       if (!isVisionReady()) {
         setStatus('Preparing vision model in browser...');
         await loadVision((percent) => {
@@ -183,10 +281,26 @@ export default function App() {
       // Post assistant response to conversation history
       const response = description || '(Model did not return a description.)';
       addMessage('assistant', response);
-      await speakResponse(response, 'Image description ready.');
+
+      if (description) {
+        speakText(description, {
+          onStart: () => {
+            setIsSpeaking(true);
+            setIsPaused(false);
+          },
+          onEnd: () => {
+            setIsSpeaking(false);
+            setIsPaused(false);
+          },
+          onError: () => {
+            setIsSpeaking(false);
+            setIsPaused(false);
+          },
+        });
+      }
     } catch (err) {
-      console.error('Vision inference error:', err);
-      const errorMsg = err.message || 'An unexpected error occurred during image description.';
+      console.error('Vision/QA error:', err);
+      const errorMsg = err.message || 'An unexpected error occurred during image processing.';
       setStatus(`Error: ${errorMsg}`);
       setProgress(null);
       setIsDescribing(false);
@@ -194,6 +308,103 @@ export default function App() {
       const response = `Could not describe image: ${errorMsg}`;
       addMessage('assistant', response);
       await speakResponse(response, 'Image description failed.');
+    }
+  };
+
+  // OCR Read Text handler
+  const handleReadText = async (imageFile) => {
+    // 1. Cancel any speech currently in progress
+    stopSpeechOutput();
+    stopSpeaking();
+    setIsSpeaking(false);
+    setIsPaused(false);
+
+    const fileToProcess = imageFile || selectedImage;
+    if (!fileToProcess) {
+      setStatus('Please select or capture an image first.');
+      return;
+    }
+
+    setIsReadingText(true);
+    setProgress(null);
+
+    // Post user request to conversation
+    addMessage('user', 'Read text from this image.');
+
+    try {
+      // 2. Lazy-load OCR worker if not ready, announcing milestone progress
+      if (!isOcrReady()) {
+        setStatus('Initializing OCR engine...');
+        let lastMilestone = -1;
+        const milestones = [0, 25, 50, 75, 100];
+
+        await loadOcr((percent) => {
+          let currentMilestone = -1;
+          for (const m of milestones) {
+            if (percent >= m) {
+              currentMilestone = m;
+            }
+          }
+
+          if (currentMilestone !== -1 && currentMilestone !== lastMilestone) {
+            lastMilestone = currentMilestone;
+            setProgress(currentMilestone);
+            setStatus(`Loading OCR engine: ${currentMilestone}%`);
+          }
+        });
+
+        // Announce "Text ready" when worker finishes loading
+        setProgress(null);
+        setStatus('Text ready');
+      }
+
+      setProgress(null);
+
+      // 3. Run recognition
+      const { text, confidence } = await readText(fileToProcess);
+      currentOcrCacheRef.current = { file: fileToProcess, text, confidence };
+
+      setIsReadingText(false);
+
+      // Announce ONLY "Text ready" in the status region after recognition completes
+      setStatus('Text ready');
+
+      if (!text) {
+        addMessage('assistant', 'No text was found in this image.', 'Text found in image');
+        return;
+      }
+
+      // If confidence below ~60, append warning
+      let formattedText = text;
+      if (confidence < 60) {
+        formattedText += '\n\nThis text may contain mistakes. Please double-check anything important, such as medicine instructions.';
+      }
+
+      addMessage('assistant', formattedText, 'Text found in image');
+
+      // 4. Speak recognized text sequentially with chunking
+      speakText(text, {
+        onStart: () => {
+          setIsSpeaking(true);
+          setIsPaused(false);
+        },
+        onEnd: () => {
+          setIsSpeaking(false);
+          setIsPaused(false);
+        },
+        onError: () => {
+          setIsSpeaking(false);
+          setIsPaused(false);
+        },
+      });
+    } catch (err) {
+      console.error('OCR recognition error:', err);
+      const errorMsg = err.message || 'This image could not be read. Try another image.';
+      setStatus(`Error: ${errorMsg}`);
+      setProgress(null);
+      setIsReadingText(false);
+
+      addMessage('assistant', errorMsg, 'Text found in image');
     }
   };
 
@@ -240,7 +451,7 @@ export default function App() {
               onClick={handleMicClick}
               label="Start speech recognition"
               isListening={isListening}
-              disabled={isProcessingVoice || isDescribing}
+              disabled={isProcessingVoice || isDescribing || isReadingText}
             />
 
             <div className="voice-controls" role="group" aria-label="Voice settings and playback controls">
@@ -250,7 +461,7 @@ export default function App() {
                   id="voice-language"
                   value={selectedLanguage}
                   onChange={(event) => setSelectedLanguage(event.target.value)}
-                  disabled={isListening || isProcessingVoice || isDescribing}
+                  disabled={isListening || isProcessingVoice || isDescribing || isReadingText}
                 >
                   {VOICE_LANGUAGES.map((language) => (
                     <option key={language.value} value={language.value}>{language.label}</option>
@@ -276,7 +487,7 @@ export default function App() {
             {/* Exactly one polite status region on the page */}
             <StatusBar
               status={status}
-              isLoading={isDescribing || isProcessingVoice}
+              isLoading={isDescribing || isReadingText || isProcessingVoice}
               progress={progress}
             />
           </section>
@@ -286,7 +497,14 @@ export default function App() {
             onImageChange={handleImageChange}
             onStatusChange={handleStatusChange}
             onDescribe={handleDescribeImage}
+            onReadText={handleReadText}
             isDescribing={isDescribing}
+            isReadingText={isReadingText}
+            isSpeaking={isSpeaking}
+            isPaused={isPaused}
+            onPauseReading={handlePauseReading}
+            onResumeReading={handleResumeReading}
+            onStopReading={handleStopReading}
             statusText={status}
           />
 
@@ -299,7 +517,7 @@ export default function App() {
       <footer className="app-footer" role="contentinfo">
         <div className="footer-container">
           <p className="footer-note">
-            Personal AI Companion supports keyboard and screen-reader access. OCR is not available yet.
+            Personal AI Companion supports keyboard and screen-reader access. Voice input, OCR, and AI models run in your browser.
           </p>
           <p className="footer-version">v0.1.0 • Foundation UI</p>
         </div>

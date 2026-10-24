@@ -139,13 +139,14 @@ async function runInference(imageBlob, question) {
     throw new Error('Vision model is not loaded yet. Call loadVision() before requesting image descriptions.');
   }
 
-  const promptText = question && question.trim().length > 0
-    ? question.trim()
-    : 'Describe this image in detail.';
+  const isGeneric = !question || !question.trim() || /describe this image( in detail)?\.?/i.test(question.trim());
+  const promptText = isGeneric
+    ? 'Describe what you see in this photo in two to four complete, natural sentences. Identify the main subject, its position, colors, and visible surroundings. Mention prominent headings or branding if clearly legible, but describe any other writing only as smaller printed text without guessing specific words, numbers, or dates.'
+    : question.trim();
 
   // Read image via blob URL and load_image
   let blobUrl = null;
-  let rawImage = null;
+  let rawImage;
   try {
     blobUrl = URL.createObjectURL(imageBlob);
     rawImage = await load_image(blobUrl);
@@ -187,12 +188,12 @@ async function runInference(imageBlob, question) {
     throw new Error(`Failed to preprocess image and prompt inputs: ${err.message || err}`);
   }
 
-  // Generate at most 120 new tokens with anti-repetition guards
+  // Generate at most 140 new tokens with anti-repetition guards
   let generatedTokens;
   try {
     generatedTokens = await model.generate({
       ...inputs,
-      max_new_tokens: 120,
+      max_new_tokens: 140,
       repetition_penalty: 1.2,
       no_repeat_ngram_size: 3,
     });
@@ -221,6 +222,18 @@ async function runInference(imageBlob, question) {
       });
       if (fullDecoded && fullDecoded[0]) {
         answer = fullDecoded[0].replace(formattedPrompt, '').trim();
+      }
+    }
+
+    // Ensure response terminates cleanly at a sentence boundary rather than being cut off mid-sentence
+    if (answer && !/[.!?]$/.test(answer)) {
+      const lastSentenceEnd = Math.max(
+        answer.lastIndexOf('.'),
+        answer.lastIndexOf('!'),
+        answer.lastIndexOf('?')
+      );
+      if (lastSentenceEnd > 25) {
+        answer = answer.slice(0, lastSentenceEnd + 1).trim();
       }
     }
 
