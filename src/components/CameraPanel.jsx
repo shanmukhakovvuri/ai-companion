@@ -7,11 +7,20 @@ import React, { useState, useEffect, useRef } from 'react';
  * - onImageChange: Callback invoked with the selected File object or null
  * - onStatusChange: Callback invoked with status descriptions for user feedback
  */
-export default function CameraPanel({ onImageChange, onStatusChange }) {
+export default function CameraPanel({
+  onImageChange,
+  onStatusChange,
+  onDescribe,
+  isDescribing = false,
+}) {
   const [selectedFile, setSelectedFile] = useState(null);
   const [previewUrl, setPreviewUrl] = useState(null);
+  const [question, setQuestion] = useState('');
   const [validationError, setValidationError] = useState(null);
   const fileInputRef = useRef(null);
+
+  const hasImage = Boolean(selectedFile);
+  const canDescribe = hasImage && !isDescribing;
 
   // Clean up object URLs to prevent memory leaks
   useEffect(() => {
@@ -51,7 +60,7 @@ export default function CameraPanel({ onImageChange, onStatusChange }) {
     setValidationError(null);
 
     if (onImageChange) onImageChange(file);
-    if (onStatusChange) onStatusChange('Image selected. Visual analysis is not available yet.');
+    if (onStatusChange) onStatusChange('Image selected. Click "Describe" to analyze with local AI.');
   };
 
   const handleClearImage = () => {
@@ -60,6 +69,7 @@ export default function CameraPanel({ onImageChange, onStatusChange }) {
     }
     setSelectedFile(null);
     setPreviewUrl(null);
+    setQuestion('');
     setValidationError(null);
     if (fileInputRef.current) fileInputRef.current.value = '';
     if (onImageChange) onImageChange(null);
@@ -157,6 +167,7 @@ export default function CameraPanel({ onImageChange, onStatusChange }) {
                 className="btn-replace-image"
                 onClick={handleTriggerInput}
                 aria-label="Replace current image"
+                disabled={isDescribing}
               >
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false">
                   <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67" />
@@ -168,6 +179,7 @@ export default function CameraPanel({ onImageChange, onStatusChange }) {
                 className="btn-replace-image"
                 onClick={handleClearImage}
                 aria-label="Clear current image"
+                disabled={isDescribing}
               >
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false">
                   <line x1="18" y1="6" x2="6" y2="18" />
@@ -177,30 +189,70 @@ export default function CameraPanel({ onImageChange, onStatusChange }) {
               </button>
             </div>
           </div>
+
+          {/* Optional Question Box */}
+          <div className="camera-question-wrapper">
+            <label htmlFor="camera-question-input" className="camera-question-label">
+              <span>Ask about this photo</span>
+              <span className="camera-question-optional">(optional)</span>
+            </label>
+            <input
+              id="camera-question-input"
+              type="text"
+              className="camera-question-input"
+              placeholder="Ask a question about this photo (optional)"
+              value={question}
+              onChange={(e) => setQuestion(e.target.value)}
+              disabled={isDescribing}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  if (canDescribe && onDescribe) {
+                    const trimmed = question.trim();
+                    onDescribe(selectedFile, trimmed.length > 0 ? trimmed : 'Describe this image in detail.');
+                  }
+                }
+              }}
+            />
+          </div>
         </div>
       )}
 
-      {/* Camera Action Buttons (Focusable with aria-disabled="true" and visible explanations) */}
+      {/* Camera Action Buttons (Focusable with aria-disabled and visible explanations) */}
       <div className="camera-actions-grid" role="group" aria-label="Visual AI actions">
         <div>
           <button
             type="button"
-            className="btn-camera-action"
-            aria-disabled="true"
+            className={`btn-camera-action ${canDescribe ? 'btn-camera-action--active' : ''}`}
+            aria-disabled={!canDescribe}
+            aria-busy={isDescribing}
             aria-describedby="describe-explanation"
-            onClick={(e) => e.preventDefault()}
+            onClick={(e) => {
+              if (canDescribe && onDescribe) {
+                const trimmed = question.trim();
+                onDescribe(selectedFile, trimmed.length > 0 ? trimmed : 'Describe this image in detail.');
+              } else {
+                e.preventDefault();
+              }
+            }}
           >
             <span className="camera-action-label">
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false">
                 <circle cx="12" cy="12" r="10" />
                 <path d="M12 16v-4M12 8h.01" />
               </svg>
-              Describe
+              {isDescribing ? 'Describing...' : 'Describe'}
             </span>
-            <span className="camera-action-badge" aria-hidden="true">Coming soon</span>
+            <span className="camera-action-badge" aria-hidden="true">
+              {isDescribing ? 'Processing' : (hasImage ? 'Ready' : 'Requires image')}
+            </span>
           </button>
           <span id="describe-explanation" className="action-help-text">
-            Not available yet. AI image description is being prepared.
+            {isDescribing
+              ? 'Analyzing image with local AI...'
+              : (hasImage
+                  ? 'Describe this photo using local AI.'
+                  : 'Select or take a photo first to enable AI description.')}
           </span>
         </div>
 

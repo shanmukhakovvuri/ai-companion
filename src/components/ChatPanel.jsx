@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 
 /**
  * ChatPanel: Clean, accessible conversation area with empty state and example commands.
@@ -7,6 +7,13 @@ import React from 'react';
  * - messages: Array of message objects [{ id, sender: 'user' | 'assistant', text, timestamp }]
  */
 export default function ChatPanel({ messages = [] }) {
+  const containerRef = useRef(null);
+
+  useEffect(() => {
+    if (containerRef.current) {
+      containerRef.current.scrollTop = containerRef.current.scrollHeight;
+    }
+  }, [messages]);
   const examplePrompts = [
     {
       id: 'example-1',
@@ -59,6 +66,7 @@ export default function ChatPanel({ messages = [] }) {
 
       {/* Accessible conversation feed with live region scoped strictly to message list */}
       <div
+        ref={containerRef}
         className="chat-messages-container"
         role="log"
         aria-live="polite"

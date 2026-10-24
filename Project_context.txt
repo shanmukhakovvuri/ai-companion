@@ -1,0 +1,124 @@
+# PROJECT_CONTEXT.md: Personal AI Companion (hackathon handoff)
+
+*Paste this whole file into any AI assistant and say: "Read this and continue helping us from 'Next steps'." Last updated: Sat 24 Oct 2026, ~11:50 am IST.*
+
+## 1. Situation
+- 24-hour-style hackathon. **Submission deadline: Sun 25 Oct 2026, 3:00 pm IST.** Deliverable: a **working, publicly deployed website link** (no PowerPoint or presentation needed).
+- Team: **4 complete coding beginners, only 3 laptops.** About 99% of code will be written by AI tools. Budget **₹0** (free / open-source only).
+- Judging criteria: usefulness, creativity, functionality, user experience, effective technology integration, technical quality, final demonstration.
+- Project (finalized): **Personal AI Companion** web app.
+
+### Required features
+1. Voice interaction (speak, get spoken replies)
+2. AI chat assistant
+3. AI vision (camera or uploaded image: describe surroundings, identify objects)
+4. OCR text reading aloud (notices, books, signs, labels)
+5. Website navigation by voice ("Open YouTube")
+6. Smart command recognition (choose the right action from the request)
+7. Accessibility support (voice-first, spoken feedback, large clear controls)
+
+### Hard requirements
+- Free hosting, public URL. AI inference should run **in the browser** (no paid API as primary solution). **Real AI inference**, not hardcoded fake replies.
+- No database or backend unless truly needed (decision: **none needed**).
+- Explain things simply; step-by-step; one feature at a time; complete code per file when we reach that step; completion checklist per stage. Don't dump the whole app in one response.
+- Be honest about limits (device speed, downloads, browser support). If a feature can't be done reliably, say so and suggest an alternative.
+
+## 2. Architecture decisions (made)
+- **Static React app (Vite, JavaScript, not TypeScript), no backend, no database, no logins, no API keys, no .env.**
+- Settings (language/voice) saved in `localStorage`.
+- AI models run in the browser through **Transformers.js** (`@huggingface/transformers`, v4) with WebGPU, inside a **Web Worker** so the page doesn't freeze. Models download from Hugging Face on first use and are cached by the browser. Load each model **lazily** (only when its feature is first used).
+- Flow: Mic button, then speech recognition, then **command router**, then one of: `open_site` (allowlist of sites), `describe_scene` (vision model), `read_text` (OCR, not the vision model), `chat` (language model). Reply is shown on screen and spoken.
+
+| Feature | Chosen tech | Notes |
+|---|---|---|
+| Vision | `HuggingFaceTB/SmolVLM-256M-Instruct` (Transformers.js, WebGPU) | Apache 2.0 (verified). Optional upgrade: `SmolVLM-500M-Instruct`. |
+| OCR | Tesseract.js (`tesseract.js` v7) | Apache 2.0 (confirm). English good; Hindi weaker, extra data. Use OCR (not vision) for reading text; small VLMs misread words. |
+| Chat | `onnx-community/Qwen3-0.6B-ONNX` via Transformers.js | Apache 2.0 (confirm). Must disable Qwen3 "thinking mode". Fallbacks: `HuggingFaceTB/SmolLM2-360M-Instruct`, or WebLLM + Llama 3.2 1B (~700 MB). Real size not yet measured. |
+| Speech to text | Browser Web Speech API (Chrome/Edge) | Free, no download, but Chrome sends audio to Google (needs internet). Optional later: Whisper-tiny via Transformers.js. |
+| Text to speech | Browser `speechSynthesis` | Free; Hindi voices may be missing on some devices. Optional later: Kokoro-82M (Apache 2.0, ~86-326 MB). |
+| Smart commands | Keyword/regex rules first; optional tiny embedding model (e.g. `Supabase/gte-small`) later | Don't use the 0.6B chat model as the classifier. |
+| Hosting | Vercel (Hobby, free) deploying from GitHub; backup: GitHub Pages or Netlify | Models are fetched from Hugging Face, not our hosting. |
+
+### Known limitations to keep in mind
+- First model download is slow (vision model took ~55 s on first load), so the UI needs progress bars and a "Preparing the AI" screen.
+- Supported target: **desktop Chrome or Edge**. Many phones can't run these models; show a clear message and keep speech/"open website" working.
+- Browsers may block `window.open` triggered by a voice command (no click). Fallback: show a big "Open YouTube" button and say "Press the button".
+- Small vision model is wrong ~1 time in 3 on small objects; add "Describe again", a "may be wrong" note, and prepare tested demo objects.
+- "Offline" only partly true (speech recognition needs internet).
+
+## 3. What has been done so far
+### Vision feasibility test (done)
+- File **`vision-test.html`** (single page, loads Transformers.js from `https://cdn.jsdelivr.net/npm/@huggingface/transformers@4`). Uses `AutoProcessor`, `AutoModelForVision2Seq`, `load_image`, `TextStreamer`, `do_image_splitting: false`, images shrunk to 640 px. WebGPU dtype: `{ embed_tokens: "fp16", vision_encoder: "q4", decoder_model_merged: "q4" }`; WASM fallback uses `q8` for all three. (API names were not verified against the package in a sandbox, but they worked on the user's laptop.)
+- Result on the user's laptop (Ryzen 7 260, 24 GB RAM, RTX 5050 + AMD RDNA 3 graphics, Windows; the browser used the AMD graphics): WebGPU available; model **first load 54.9 s, cached load ~2.8 s**; runs took **4.1 s, 2.5 s, 1.8 s**. Answers: mouse photo correct (even blurred); earbuds case correct once, missed once, and once called it "a case and a remote"; text reading gave "cromolyn sodium" and "ophthalmic solution" (correctness not confirmed). Verdict: **speed passes; accuracy is the weak point.**
+- Not yet tested: 500M vision model, the chat model, memory use with several models loaded, other teammates' laptops.
+
+### Stage 1 setup (done by Member C's laptop)
+- GitHub repo (public): **https://github.com/shanmukhakovvuri/ai-companion** (owner: shanmukhakovvuri).
+- Created with `git clone`, then `npm create vite@latest . -- --template react` (JavaScript; **ESLint** chosen as linter), then `npm install`.
+- Installed extra packages: `npm install @huggingface/transformers tesseract.js` (0 vulnerabilities; harmless npm "install-scripts" warnings about tesseract.js, onnxruntime-node, protobufjs; safe to ignore for a browser app).
+- Committed and pushed to GitHub (`git add .`, `git commit`, `git push`).
+- **Deployed on Vercel** from the GitHub repo (framework: Vite). Public link: *(add the exact vercel.app URL here)*. Checks still to confirm: opens in a private window and on a phone with mobile data.
+
+### Current project files (default Vite React template, nothing custom yet)
+```
+ai-companion/
+  README.md            (default; to rewrite)
+  index.html
+  package.json         (includes @huggingface/transformers, tesseract.js, react, vite, eslint)
+  package-lock.json
+  vite.config.js
+  eslint.config.js
+  .gitignore
+  public/vite.svg
+  src/main.jsx
+  src/App.jsx
+  src/App.css
+  src/index.css
+  src/assets/
+```
+
+## 4. Team plan
+| Member | Laptop | Owns | Role |
+|---|---|---|---|
+| A | Laptop 1 (24 GB, RTX 5050, the strongest) | `src/ai/` | Vision, chat, OCR, workers, lazy loading; turns `vision-test.html` into a module; heavy testing |
+| B | Laptop 2 | `src/components/`, `src/styles/` | UI, large controls, screen-reader labels, loading progress |
+| C | Laptop 3 | `src/voice/`, `src/actions/`, `App.jsx`, deployment | Speech in/out, command router, integration, owns repo and Vercel |
+| D | No laptop | docs and testing | Pair-works as prompt writer/reviewer, tests on a phone and spare laptop, keeps the feature checklist, writes README, demo script, merges pull requests on github.com |
+
+Target folder layout to build toward: `src/components/`, `src/styles/`, `src/ai/` (worker.js, vision.js, chat.js, ocr.js, intent.js), `src/voice/` (listen.js, speak.js), `src/actions/` (commands.js, openSite.js).
+
+### Git rules (beginners)
+- Each person works on their own branch (`feature-ai`, `feature-ui`, `feature-voice`) and edits only their own folders. Start each session with `git pull`; commit small and often: `git add .`, `git commit -m "message"`, `git push`.
+- New packages: announce in the group chat, commit `package.json` + `package-lock.json` in their own commit; everyone pulls immediately.
+- Member D merges via GitHub pull requests after a quick test.
+- If blocked: paste the exact error into the AI tool; if it fails twice, ask a teammate; after 15 minutes tell Member D, who decides to simplify or drop the feature.
+
+### Stage 1 status
+- Done: repo, app, packages, push, Vercel deploy (Member C).
+- **Pending:** teammates accepting GitHub invites and running `git clone https://github.com/shanmukhakovvuri/ai-companion.git`, `cd ai-companion`, `npm install`, `npm run dev` (each should see the React page); creating branches (`git checkout -b feature-ai`, then `git push -u origin HEAD`).
+
+## 5. Schedule (IST)
+| When | Goal |
+|---|---|
+| Sat 11:30-1:00 | Stage 1: repo, blank app, public link (mostly done) |
+| Sat 1:00-4:00 | Basic interface; Member A moves vision test into `src/ai/` |
+| Sat 4:00-7:00 | Vision working on the public link (Checkpoint 1) |
+| Sat 7:00-11:00 | Voice, "open website", OCR |
+| Sat 11 pm-Sun 2 am | Chat model, loading screens (sleep in shifts) |
+| Sun 6:00-8:00 | Join everything, accessibility pass. **Feature freeze 8 am** |
+| Sun 8:00-11:30 | Test on all laptops and phones, fix bugs |
+| Sun 11:30-1:00 pm | Final deploy, verify public link, **submit by 1 pm** |
+| Sun 1:00-3:00 | Buffer only |
+
+**Never cut:** the deployed link, mic with spoken replies, vision, OCR, "open website". **Cut in this order if behind:** visual polish, Hindi, better voices (Kokoro), smart-command embeddings (keep rules), live camera (keep photo upload), chat model quality.
+
+## 6. Next steps (continue from here)
+1. Confirm Stage 1: teammates clone and run the app; everyone creates a branch; confirm the Vercel link works in a private window and on a phone.
+2. **Stage 2:** basic interface (big mic button, chat area, photo/camera panel, status/loading area) and move the vision test into `src/ai/` as a Web Worker module; deploy; verify on the public link (Checkpoint 1).
+3. Then voice loop + command router + "open website", then OCR, then chat model, then testing. Give ready-to-paste prompts for the AI coding tool, **one task per prompt**, with the file path each file belongs in and how to test it.
+4. Still to test: 500M vision model, Qwen3-0.6B chat (and size), several models loaded together, other laptops.
+
+## 7. Notes for the next AI assistant
+- The user is on Windows (PowerShell), Node and Git installed on all laptops, no Python. Commands must be PowerShell-friendly. Use `git clone <url>` style full commands (the user once pasted just a URL into PowerShell).
+- The user prefers fewer, larger messages (usage limits on a free plan): batch steps together.
+- Be honest about uncertainty; don't claim things were tested that weren't. Don't assume Hindi support works.

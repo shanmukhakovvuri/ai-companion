@@ -3,6 +3,7 @@ import MicButton from './components/MicButton';
 import CameraPanel from './components/CameraPanel';
 import ChatPanel from './components/ChatPanel';
 import StatusBar from './components/StatusBar';
+import { loadVision, describeImage, isVisionReady } from './ai/vision';
 
 /**
  * App: Accessible layout and state-orchestration layer for Personal AI Companion.
@@ -17,7 +18,9 @@ import StatusBar from './components/StatusBar';
  * 4. Footer
  */
 export default function App() {
-  const [status, setStatus] = useState('Voice input is not available yet.');
+  const [status, setStatus] = useState('Select an image to get started.');
+  const [progress, setProgress] = useState(null);
+  const [isDescribing, setIsDescribing] = useState(false);
   const [messages, setMessages] = useState([]);
   const [selectedImage, setSelectedImage] = useState(null);
 
@@ -34,6 +37,74 @@ export default function App() {
   // Image change handler from CameraPanel (stores selected File or null)
   const handleImageChange = (file) => {
     setSelectedImage(file);
+  };
+
+  // Vision description handler
+  const handleDescribeImage = async (imageFile, customQuestion) => {
+    const fileToProcess = imageFile || selectedImage;
+    if (!fileToProcess) {
+      setStatus('Please select or capture an image first.');
+      return;
+    }
+
+    const questionText = (typeof customQuestion === 'string' && customQuestion.trim().length > 0)
+      ? customQuestion.trim()
+      : 'Describe this image in detail.';
+
+    setIsDescribing(true);
+    setProgress(null);
+
+    // Post user command to conversation history
+    const userMessage = {
+      id: `user-${Date.now()}`,
+      sender: 'user',
+      text: questionText,
+      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+    };
+    setMessages((prev) => [...prev, userMessage]);
+
+    try {
+      // Lazy-load model if not already loaded into worker
+      if (!isVisionReady()) {
+        setStatus('Preparing vision model in browser...');
+        await loadVision((percent) => {
+          setProgress(percent);
+          setStatus(`Downloading vision model: ${percent}%`);
+        });
+      }
+
+      // Run inference
+      setProgress(null);
+      setStatus('Analyzing image with local AI...');
+
+      const description = await describeImage(fileToProcess, questionText);
+
+      setStatus('Image description ready.');
+      setIsDescribing(false);
+
+      // Post assistant response to conversation history
+      const assistantMessage = {
+        id: `assistant-${Date.now()}`,
+        sender: 'assistant',
+        text: description || '(Model did not return a description.)',
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      };
+      setMessages((prev) => [...prev, assistantMessage]);
+    } catch (err) {
+      console.error('Vision inference error:', err);
+      const errorMsg = err.message || 'An unexpected error occurred during image description.';
+      setStatus(`Error: ${errorMsg}`);
+      setProgress(null);
+      setIsDescribing(false);
+
+      const errorMessage = {
+        id: `assistant-${Date.now()}`,
+        sender: 'assistant',
+        text: `Could not describe image: ${errorMsg}`,
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      };
+      setMessages((prev) => [...prev, errorMessage]);
+    }
   };
 
   return (
@@ -88,13 +159,19 @@ export default function App() {
             </div>
 
             {/* Exactly one polite status region on the page */}
-            <StatusBar status={status} />
+            <StatusBar
+              status={status}
+              isLoading={isDescribing}
+              progress={progress}
+            />
           </section>
 
           {/* 2. Scene & Document Reading Section (DOM Order: Second in main) */}
           <CameraPanel
             onImageChange={handleImageChange}
             onStatusChange={handleStatusChange}
+            onDescribe={handleDescribeImage}
+            isDescribing={isDescribing}
           />
 
           {/* 3. Conversation Panel Section (DOM Order: Third in main) */}
