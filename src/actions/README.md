@@ -1,4 +1,6 @@
-# Companion Actions Folder (`src/actions`)
+# Companion Actions (`src/actions`)
 
-This folder manages quick companion actions and business logic:
-- `companionActions.js`: Handlers for OCR image analysis, text summarization, browser timer reminders, and conversation exporting.
+- `commandRouter.js` exports `routeCommand(transcript, options)` to return a structured request for an allowlisted website, image description, text reading, or an unknown command.
+- `openAllowedSite(siteId)` navigates only to the fixed YouTube and Google URLs in the current tab.
+
+Image description requests are not executed by the router. OCR is reported as unavailable until an OCR module is implemented and connected.

@@ -1,5 +1,6 @@
-# Voice Engine Folder (`src/voice`)
+# Voice Modules (`src/voice`)
 
-This folder manages browser-native voice interaction:
-- `speechToText.js`: Web Speech API recognition (Speech-to-Text) with accessible status cues.
-- `textToSpeech.js`: Web Speech Synthesis (Text-to-Speech) for companion vocal replies.
+- `speechInput.js` exports `isSpeechRecognitionSupported()`, `startSpeechRecognition(options)`, and `stopSpeechRecognition()`. Listening starts only when the caller explicitly invokes the start function.
+- `speechOutput.js` exports `speakText(text, options)` and `stopSpeaking()` for browser-native spoken responses.
+
+Both modules use browser APIs only. Recognition support and errors are reported to the caller; the app modules do not save transcripts or send them to an app backend. The browser's speech recognition provider may process audio, depending on browser and settings.

@@ -1,9 +1,18 @@
-import React, { useState } from 'react';
+import { useEffect, useState } from 'react';
 import MicButton from './components/MicButton';
 import CameraPanel from './components/CameraPanel';
 import ChatPanel from './components/ChatPanel';
 import StatusBar from './components/StatusBar';
 import { loadVision, describeImage, isVisionReady } from './ai/vision';
+import { isSpeechRecognitionSupported, startSpeechRecognition, stopSpeechRecognition } from './voice/speechInput';
+import { speakText, stopSpeaking } from './voice/speechOutput';
+import { openAllowedSite, routeCommand } from './actions/commandRouter';
+
+const VOICE_LANGUAGES = [
+  { value: 'en-IN', label: 'English (India)' },
+  { value: 'hi-IN', label: 'Hindi (India)' },
+  { value: 'te-IN', label: 'Telugu (India)' },
+];
 
 /**
  * App: Accessible layout and state-orchestration layer for Personal AI Companion.
@@ -18,15 +27,111 @@ import { loadVision, describeImage, isVisionReady } from './ai/vision';
  * 4. Footer
  */
 export default function App() {
-  const [status, setStatus] = useState('Select an image to get started.');
+  const [status, setStatus] = useState(() => (
+    isSpeechRecognitionSupported()
+      ? 'Ready. Choose a language and activate the microphone.'
+      : 'Speech recognition is not available in this browser. Try Chrome or Edge.'
+  ));
   const [progress, setProgress] = useState(null);
   const [isDescribing, setIsDescribing] = useState(false);
   const [messages, setMessages] = useState([]);
   const [selectedImage, setSelectedImage] = useState(null);
+  const [selectedLanguage, setSelectedLanguage] = useState('en-IN');
+  const [isListening, setIsListening] = useState(false);
+  const [isProcessingVoice, setIsProcessingVoice] = useState(false);
+  const [isSpeaking, setIsSpeaking] = useState(false);
 
-  // Microphone interaction handler
-  const handleMicClick = () => {
-    setStatus('Voice input is not available yet.');
+  useEffect(() => () => {
+    stopSpeechRecognition();
+    stopSpeaking();
+  }, []);
+
+  const addMessage = (sender, text) => {
+    setMessages((prev) => [...prev, {
+      id: `${sender}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      sender,
+      text,
+      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+    }]);
+  };
+
+  const speakResponse = async (text, completionStatus = 'Response ready.') => {
+    if (!text?.trim()) return;
+    setIsSpeaking(true);
+    setStatus('Speaking response...');
+    try {
+      const finished = await speakText(text, { lang: selectedLanguage });
+      if (finished) setStatus(completionStatus);
+    } catch (error) {
+      setStatus(`Error: ${error.message || 'Spoken response could not be played.'}`);
+    } finally {
+      setIsSpeaking(false);
+    }
+  };
+
+  const handleMicClick = async () => {
+    if (isListening) {
+      stopSpeechRecognition();
+      setStatus('Stopping speech recognition...');
+      return;
+    }
+    if (isProcessingVoice || isDescribing) return;
+
+    stopSpeaking();
+    setIsSpeaking(false);
+    setStatus(`Starting speech recognition in ${selectedLanguage}...`);
+    setIsListening(true);
+
+    try {
+      const recognition = startSpeechRecognition({ lang: selectedLanguage });
+      setStatus(`Listening in ${selectedLanguage}. Speak a command.`);
+      const transcript = await recognition;
+      setIsListening(false);
+      setIsProcessingVoice(true);
+
+      const result = routeCommand(transcript, {
+        hasImage: Boolean(selectedImage),
+        visionAvailable: typeof describeImage === 'function',
+        ocrAvailable: false,
+        language: selectedLanguage,
+      });
+
+      if (result.action === 'describe_image' && result.status === 'ready') {
+        await handleDescribeImage(selectedImage, transcript);
+        return;
+      }
+
+      addMessage('user', transcript);
+      addMessage('assistant', result.message);
+
+      if (result.action === 'open_site' && result.status === 'ready') {
+        await speakResponse(result.message, 'Command completed successfully.');
+        openAllowedSite(result.params.siteId);
+      } else {
+        const completionStatus = result.status === 'unavailable'
+          ? 'Feature unavailable.'
+          : result.status === 'needs_input'
+            ? 'Image needed.'
+            : 'Response ready.';
+        await speakResponse(result.message, completionStatus);
+      }
+    } catch (error) {
+      setIsListening(false);
+      const errorMessage = error.message || 'Speech recognition failed. Please try again.';
+      setStatus(error.code === 'unsupported'
+        ? 'Speech recognition is not available in this browser. Try Chrome or Edge.'
+        : `Error: ${errorMessage}`);
+    } finally {
+      setIsListening(false);
+      setIsProcessingVoice(false);
+    }
+  };
+
+  const handleStopSpeaking = () => {
+    if (stopSpeaking()) {
+      setIsSpeaking(false);
+      setStatus('Spoken response stopped.');
+    }
   };
 
   // Status updates from child components (e.g., image selection feedback)
@@ -54,14 +159,7 @@ export default function App() {
     setIsDescribing(true);
     setProgress(null);
 
-    // Post user command to conversation history
-    const userMessage = {
-      id: `user-${Date.now()}`,
-      sender: 'user',
-      text: questionText,
-      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-    };
-    setMessages((prev) => [...prev, userMessage]);
+    addMessage('user', questionText);
 
     try {
       // Lazy-load model if not already loaded into worker
@@ -83,13 +181,9 @@ export default function App() {
       setIsDescribing(false);
 
       // Post assistant response to conversation history
-      const assistantMessage = {
-        id: `assistant-${Date.now()}`,
-        sender: 'assistant',
-        text: description || '(Model did not return a description.)',
-        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      };
-      setMessages((prev) => [...prev, assistantMessage]);
+      const response = description || '(Model did not return a description.)';
+      addMessage('assistant', response);
+      await speakResponse(response, 'Image description ready.');
     } catch (err) {
       console.error('Vision inference error:', err);
       const errorMsg = err.message || 'An unexpected error occurred during image description.';
@@ -97,13 +191,9 @@ export default function App() {
       setProgress(null);
       setIsDescribing(false);
 
-      const errorMessage = {
-        id: `assistant-${Date.now()}`,
-        sender: 'assistant',
-        text: `Could not describe image: ${errorMsg}`,
-        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      };
-      setMessages((prev) => [...prev, errorMessage]);
+      const response = `Could not describe image: ${errorMsg}`;
+      addMessage('assistant', response);
+      await speakResponse(response, 'Image description failed.');
     }
   };
 
@@ -148,20 +238,45 @@ export default function App() {
 
             <MicButton
               onClick={handleMicClick}
-              label="Activate microphone (Voice input is not available yet)"
+              label="Start speech recognition"
+              isListening={isListening}
+              disabled={isProcessingVoice || isDescribing}
             />
 
+            <div className="voice-controls" role="group" aria-label="Voice settings and playback controls">
+              <div className="voice-language-control">
+                <label htmlFor="voice-language">Speech language</label>
+                <select
+                  id="voice-language"
+                  value={selectedLanguage}
+                  onChange={(event) => setSelectedLanguage(event.target.value)}
+                  disabled={isListening || isProcessingVoice || isDescribing}
+                >
+                  {VOICE_LANGUAGES.map((language) => (
+                    <option key={language.value} value={language.value}>{language.label}</option>
+                  ))}
+                </select>
+              </div>
+              <button
+                type="button"
+                className="voice-stop-button"
+                onClick={handleStopSpeaking}
+                disabled={!isSpeaking}
+                aria-label="Stop spoken response"
+              >
+                Stop speaking
+              </button>
+            </div>
+
             <div>
-              <p className="voice-instruction">Tap the microphone to interact.</p>
-              <p className="voice-subtext">
-                Speech recognition is currently in development and not active yet.
-              </p>
+              <p className="voice-instruction">{isListening ? 'Listening. Speak a command.' : 'Activate the microphone to speak.'}</p>
+              <p className="voice-subtext">The microphone button also stops listening. Speech is handled by your browser.</p>
             </div>
 
             {/* Exactly one polite status region on the page */}
             <StatusBar
               status={status}
-              isLoading={isDescribing}
+              isLoading={isDescribing || isProcessingVoice}
               progress={progress}
             />
           </section>
@@ -184,7 +299,7 @@ export default function App() {
       <footer className="app-footer" role="contentinfo">
         <div className="footer-container">
           <p className="footer-note">
-            Personal AI Companion is built for screen-reader and keyboard accessibility. Voice, OCR, and AI models are in active development.
+            Personal AI Companion supports keyboard and screen-reader access. OCR is not available yet.
           </p>
           <p className="footer-version">v0.1.0 • Foundation UI</p>
         </div>
