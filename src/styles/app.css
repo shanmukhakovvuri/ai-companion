@@ -339,6 +339,68 @@ html, body {
   max-width: 380px;
 }
 
+.voice-controls {
+  width: min(100%, 380px);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.voice-language-control {
+  display: flex;
+  flex: 1 1 190px;
+  flex-direction: column;
+  gap: 6px;
+  text-align: left;
+}
+
+.voice-language-control label {
+  color: var(--color-text-secondary);
+  font-size: 0.8125rem;
+  font-weight: 600;
+}
+
+.voice-language-control select,
+.voice-stop-button {
+  min-height: 42px;
+  border: 1px solid var(--color-border-medium);
+  border-radius: var(--radius-sm);
+  font: inherit;
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.voice-language-control select {
+  width: 100%;
+  padding: 8px 36px 8px 12px;
+  background-color: var(--color-bg-input);
+  color: var(--color-text-primary);
+  cursor: pointer;
+}
+
+.voice-stop-button {
+  flex: 1 1 130px;
+  padding: 8px 14px;
+  background-color: var(--color-bg-subtle);
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  transition: background-color var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast);
+}
+
+.voice-stop-button:hover:not(:disabled) {
+  background-color: var(--color-bg-hover);
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+}
+
+.voice-language-control select:disabled,
+.voice-stop-button:disabled {
+  color: var(--color-text-disabled);
+  cursor: not-allowed;
+}
+
 /* ==========================================================================
    MicButton Component (Electric Yellow Circular Button)
    ========================================================================== */

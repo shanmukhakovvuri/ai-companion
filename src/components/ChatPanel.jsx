@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import { useEffect, useRef } from 'react';
 
 /**
  * ChatPanel: Clean, accessible conversation area with empty state and example commands.
@@ -82,11 +82,11 @@ export default function ChatPanel({ messages = [] }) {
             </div>
             <h3 className="empty-state-heading">No messages yet</h3>
             <p className="empty-state-desc">
-              Voice recognition and conversational AI capabilities are currently in development. Future transcripts and replies will appear here.
+              Spoken commands and assistant replies will appear here after you use the microphone.
             </p>
 
             <div className="example-prompts-section">
-              <span className="example-prompts-label">Planned voice commands</span>
+              <span className="example-prompts-label">Example voice commands</span>
               <ul className="example-prompts-list" aria-label="List of planned voice commands">
                 {examplePrompts.map((prompt) => (
                   <li key={prompt.id} className="example-prompt-chip">

@@ -1,5 +1,3 @@
-import React from 'react';
-
 /**
  * MicButton: Accessible, prominent primary interaction button for voice activation.
  * 
@@ -12,6 +10,7 @@ export default function MicButton({
   onClick,
   disabled = false,
   label = 'Start voice interaction',
+  isListening = false,
 }) {
   return (
     <div className="mic-button-wrapper">
@@ -20,7 +19,9 @@ export default function MicButton({
         className="mic-button"
         onClick={onClick}
         disabled={disabled}
-        aria-label={label}
+        aria-label={isListening ? 'Stop listening' : label}
+        aria-pressed={isListening}
+        title={isListening ? 'Stop listening' : label}
       >
         {/* Crisp inline SVG Microphone Icon with explicit non-focusable state */}
         <svg
