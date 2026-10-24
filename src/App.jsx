@@ -1,122 +1,116 @@
-import { useState } from 'react'
-import heroImg from './assets/hero.png'
-import reactLogo from './assets/react.svg'
-import viteLogo from './assets/vite.svg'
-import './App.css'
+import React, { useState } from 'react';
+import MicButton from './components/MicButton';
+import CameraPanel from './components/CameraPanel';
+import ChatPanel from './components/ChatPanel';
+import StatusBar from './components/StatusBar';
 
-function App() {
-  const [count, setCount] = useState(0)
+/**
+ * App: Accessible layout and state-orchestration layer for Personal AI Companion.
+ * 
+ * Strict Screen-Reader Reading Order:
+ * 1. Skip link
+ * 2. Header (single h1)
+ * 3. Main content:
+ *    - Voice Interaction Section (h2)
+ *    - Scene & Document Reading Section (CameraPanel h2)
+ *    - Conversation Section (ChatPanel h2)
+ * 4. Footer
+ */
+export default function App() {
+  const [status, setStatus] = useState('Voice input is not available yet.');
+  const [messages, setMessages] = useState([]);
+  const [selectedImage, setSelectedImage] = useState(null);
+
+  // Microphone interaction handler
+  const handleMicClick = () => {
+    setStatus('Voice input is not available yet.');
+  };
+
+  // Status updates from child components (e.g., image selection feedback)
+  const handleStatusChange = (newStatus) => {
+    setStatus(newStatus);
+  };
+
+  // Image change handler from CameraPanel (stores selected File or null)
+  const handleImageChange = (file) => {
+    setSelectedImage(file);
+  };
 
   return (
-    <>
-      <section id="center">
-        <div className="hero">
-          <img src={heroImg} className="base" width="170" height="179" alt="" />
-          <img src={reactLogo} className="framework" alt="React logo" />
-          <img src={viteLogo} className="vite" alt="Vite logo" />
+    <div className="app-root">
+      {/* Skip to Main Content Link for Keyboard and Screen-Reader Users */}
+      <a href="#main-content" className="skip-link">
+        Skip to main content
+      </a>
+
+      {/* Product Header */}
+      <header className="app-header" role="banner">
+        <div className="header-container">
+          <div className="brand-section">
+            <div className="brand-icon" aria-hidden="true">
+              {/* Soundwave/spark brand mark */}
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false">
+                <path d="M12 2v20M17 5v14M7 8v8M22 10v4M2 10v4" />
+              </svg>
+            </div>
+            <div className="brand-text">
+              {/* Single h1 for the entire page */}
+              <h1 className="brand-title">Personal AI <span>Companion</span></h1>
+              <p className="brand-subtitle">Your voice-first assistant</p>
+            </div>
+          </div>
+
+          {/* Plain availability indicator (NOT a live region to avoid duplicate screen-reader chatter) */}
+          <div className="header-availability" aria-hidden="true">
+            <span className="availability-dot" />
+            <span>Ready</span>
+          </div>
         </div>
-        <div>
-          <h1>Get started</h1>
-          <p>
-            Edit <code>src/App.jsx</code> and save to test <code>HMR</code>
+      </header>
+
+      {/* Main Content Landmark */}
+      <main id="main-content" className="app-main" tabIndex={-1}>
+        <div className="layout-grid">
+          {/* 1. Voice Hero Section (DOM Order: First in main) */}
+          <section className="voice-hero-card" aria-labelledby="voice-heading">
+            <h2 id="voice-heading" className="voice-hero-title">Voice Interaction</h2>
+
+            <MicButton
+              onClick={handleMicClick}
+              label="Activate microphone (Voice input is not available yet)"
+            />
+
+            <div>
+              <p className="voice-instruction">Tap the microphone to interact.</p>
+              <p className="voice-subtext">
+                Speech recognition is currently in development and not active yet.
+              </p>
+            </div>
+
+            {/* Exactly one polite status region on the page */}
+            <StatusBar status={status} />
+          </section>
+
+          {/* 2. Scene & Document Reading Section (DOM Order: Second in main) */}
+          <CameraPanel
+            onImageChange={handleImageChange}
+            onStatusChange={handleStatusChange}
+          />
+
+          {/* 3. Conversation Panel Section (DOM Order: Third in main) */}
+          <ChatPanel messages={messages} />
+        </div>
+      </main>
+
+      {/* Accessible Supporting Footer */}
+      <footer className="app-footer" role="contentinfo">
+        <div className="footer-container">
+          <p className="footer-note">
+            Personal AI Companion is built for screen-reader and keyboard accessibility. Voice, OCR, and AI models are in active development.
           </p>
+          <p className="footer-version">v0.1.0 • Foundation UI</p>
         </div>
-        <button
-          type="button"
-          className="counter"
-          onClick={() => setCount((count) => count + 1)}
-        >
-          Count is {count}
-        </button>
-      </section>
-
-      <div className="ticks"></div>
-
-      <section id="next-steps">
-        <div id="docs">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#documentation-icon"></use>
-          </svg>
-          <h2>Documentation</h2>
-          <p>Your questions, answered</p>
-          <ul>
-            <li>
-              <a href="https://vite.dev/" target="_blank">
-                <img className="logo" src={viteLogo} alt="" />
-                Explore Vite
-              </a>
-            </li>
-            <li>
-              <a href="https://react.dev/" target="_blank">
-                <img className="button-icon" src={reactLogo} alt="" />
-                Learn more
-              </a>
-            </li>
-          </ul>
-        </div>
-        <div id="social">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#social-icon"></use>
-          </svg>
-          <h2>Connect with us</h2>
-          <p>Join the Vite community</p>
-          <ul>
-            <li>
-              <a href="https://github.com/vitejs/vite" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#github-icon"></use>
-                </svg>
-                GitHub
-              </a>
-            </li>
-            <li>
-              <a href="https://chat.vite.dev/" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#discord-icon"></use>
-                </svg>
-                Discord
-              </a>
-            </li>
-            <li>
-              <a href="https://x.com/vite_js" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#x-icon"></use>
-                </svg>
-                X.com
-              </a>
-            </li>
-            <li>
-              <a href="https://bsky.app/profile/vite.dev" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#bluesky-icon"></use>
-                </svg>
-                Bluesky
-              </a>
-            </li>
-          </ul>
-        </div>
-      </section>
-
-      <div className="ticks"></div>
-      <section id="spacer"></section>
-    </>
-  )
+      </footer>
+    </div>
+  );
 }
-
-export default App

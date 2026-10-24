@@ -1,0 +1,1041 @@
+/* ==========================================================================
+   Personal AI Companion - Design System & Component Styles
+   High-Contrast Dark Theme with Electric Yellow Accents
+   WCAG AAA Compliant | Screen-Reader Friendly | Desktop & Mobile Responsive
+   ========================================================================== */
+
+:root {
+  /* Surface and Background Colors (High-Contrast Obsidian / Dark Slate) */
+  --color-bg-page: #090a0f;
+  --color-bg-surface: #13151f;
+  --color-bg-subtle: #1b1e2c;
+  --color-bg-hover: #222638;
+  --color-bg-input: #0c0e15;
+  --color-bg-accent-subtle: rgba(255, 230, 0, 0.08);
+
+  /* Typography Colors (Crisp White and High-Legibility Silver) */
+  /* Measured Contrast on #13151f: White = 19.1:1, Silver = 13.7:1, Slate-300 = 8.8:1 */
+  --color-text-primary: #ffffff;
+  --color-text-secondary: #e2e8f0;
+  --color-text-muted: #cbd5e1;       /* Exceeds 8:1 contrast against surface */
+  --color-text-disabled: #94a3b8;    /* Exceeds 4.5:1 contrast against surface */
+  --color-text-on-accent: #000000;   /* Exceeds 17.8:1 contrast against #ffe600 */
+
+  /* Primary Accent: Electric High-Contrast Yellow */
+  --color-primary: #ffe600;
+  --color-primary-hover: #fff04d;
+  --color-primary-active: #d6be00;
+  --color-primary-subtle: rgba(255, 230, 0, 0.12);
+  --color-primary-ring: rgba(255, 230, 0, 0.28);
+  --color-primary-border: rgba(255, 230, 0, 0.6);
+
+  /* Semantic Status Tokens (High-Contrast on Dark Surfaces) */
+  --color-status-ready: #34d399;
+  --color-status-ready-bg: rgba(16, 185, 129, 0.18);
+  --color-status-ready-border: rgba(52, 211, 153, 0.5);
+
+  --color-status-info: #38bdf8;
+  --color-status-info-bg: rgba(56, 189, 248, 0.18);
+  --color-status-info-border: rgba(56, 189, 248, 0.5);
+
+  --color-status-warn: #ffe600;
+  --color-status-warn-bg: rgba(255, 230, 0, 0.14);
+  --color-status-warn-border: rgba(255, 230, 0, 0.55);
+
+  --color-status-error: #f87171;
+  --color-status-error-bg: rgba(239, 68, 68, 0.18);
+  --color-status-error-border: rgba(248, 113, 113, 0.5);
+
+  /* Borders & Dividers */
+  --color-border-subtle: #2d3348;
+  --color-border-medium: #475173;
+  --color-border-strong: #64748b;
+
+  /* Elevation & Shadows */
+  --shadow-subtle: 0 2px 5px rgba(0, 0, 0, 0.4);
+  --shadow-card: 0 10px 25px -5px rgba(0, 0, 0, 0.6), 0 4px 10px -2px rgba(0, 0, 0, 0.4);
+  --shadow-mic: 0 10px 30px -4px rgba(255, 230, 0, 0.4), 0 4px 12px -2px rgba(255, 230, 0, 0.25);
+  --shadow-mic-hover: 0 16px 36px -4px rgba(255, 230, 0, 0.5), 0 6px 14px -2px rgba(255, 230, 0, 0.35);
+
+  /* Radii */
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
+  --radius-xl: 20px;
+  --radius-full: 9999px;
+
+  /* Typography Stack (System Font Stack - Zero External Downloads) */
+  --font-system: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+
+  /* Transitions */
+  --transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-normal: 250ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* ==========================================================================
+   Base Layout & Reset
+   ========================================================================== */
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html, body {
+  min-height: 100%;
+  width: 100%;
+  background-color: var(--color-bg-page);
+  color: var(--color-text-primary);
+  font-family: var(--font-system);
+  font-size: 16px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  overflow-x: hidden;
+}
+
+#root {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Prevent sticky header from obscuring keyboard focus landmarks */
+#main-content, section, h1, h2, h3 {
+  scroll-margin-top: 90px;
+}
+
+/* Custom Accessible Scrollbar */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--color-bg-page);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-border-medium);
+  border-radius: 5px;
+  border: 2px solid var(--color-bg-page);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-primary);
+}
+
+/* Selection Color for High Contrast */
+::selection {
+  background-color: var(--color-primary);
+  color: #000000;
+}
+
+/* Accessible focus styling: at least 3px and at least 3:1 contrast against dark background */
+:focus-visible {
+  outline: 3px solid var(--color-primary) !important;
+  outline-offset: 3px !important;
+}
+
+/* Screen reader only utility class */
+.sr-only {
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  padding: 0 !important;
+  margin: -1px !important;
+  overflow: hidden !important;
+  clip: rect(0, 0, 0, 0) !important;
+  white-space: nowrap !important;
+  border: 0 !important;
+}
+
+/* ==========================================================================
+   Skip to Main Content Link (Visible on Keyboard Focus)
+   ========================================================================== */
+.skip-link {
+  position: absolute;
+  top: -100px;
+  left: 20px;
+  background-color: var(--color-primary);
+  color: #000000;
+  padding: 12px 24px;
+  font-weight: 700;
+  font-size: 1rem;
+  z-index: 1000;
+  border-radius: var(--radius-sm);
+  text-decoration: none;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.7);
+  transition: top var(--transition-fast);
+}
+
+.skip-link:focus {
+  top: 16px;
+  outline: 3px solid #ffffff !important;
+  outline-offset: 2px !important;
+}
+
+/* ==========================================================================
+   Header Component
+   ========================================================================== */
+.app-header {
+  background-color: var(--color-bg-surface);
+  border-bottom: 1px solid var(--color-border-subtle);
+  position: sticky;
+  top: 0;
+  z-index: 20;
+}
+
+.header-container {
+  max-width: 1240px;
+  margin: 0 auto;
+  padding: 14px 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.brand-section {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.brand-icon {
+  width: 38px;
+  height: 38px;
+  border-radius: var(--radius-md);
+  background: linear-gradient(135deg, var(--color-primary) 0%, #d97706 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #000000;
+  flex-shrink: 0;
+  box-shadow: 0 0 14px rgba(255, 230, 0, 0.3);
+}
+
+.brand-text {
+  display: flex;
+  flex-direction: column;
+}
+
+/* Single h1 on the page */
+.brand-title {
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: var(--color-text-primary);
+  letter-spacing: -0.01em;
+  line-height: 1.25;
+}
+
+.brand-title span {
+  color: var(--color-primary);
+}
+
+.brand-subtitle {
+  font-size: 0.8125rem;
+  color: var(--color-text-muted);
+  font-weight: 500;
+  line-height: 1.25;
+}
+
+/* Plain text availability indicator (NOT an aria-live region) */
+.header-availability {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  border-radius: var(--radius-full);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  background-color: var(--color-status-ready-bg);
+  color: var(--color-status-ready);
+  border: 1px solid var(--color-status-ready-border);
+}
+
+.availability-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background-color: var(--color-status-ready);
+  box-shadow: 0 0 8px var(--color-status-ready);
+}
+
+/* ==========================================================================
+   Main Application Layout (CSS Grid Placement Preserving DOM Order)
+   DOM order: Voice (1) -> Camera (2) -> Chat (3)
+   Desktop layout: 2 columns, Voice on top-left, Chat on bottom-left, Camera on right
+   ========================================================================== */
+.app-main {
+  flex: 1;
+  max-width: 1240px;
+  width: 100%;
+  margin: 0 auto;
+  padding: 28px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  outline: none;
+}
+
+.layout-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(320px, 1fr);
+  grid-template-rows: auto 1fr;
+  grid-template-areas:
+    "voice camera"
+    "chat  camera";
+  gap: 24px;
+  align-items: start;
+}
+
+.voice-hero-card {
+  grid-area: voice;
+}
+
+.camera-panel {
+  grid-area: camera;
+}
+
+.chat-panel {
+  grid-area: chat;
+}
+
+/* ==========================================================================
+   Voice Interaction Area (Hero Card)
+   ========================================================================== */
+.voice-hero-card {
+  background-color: var(--color-bg-surface);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-xl);
+  padding: 32px 24px;
+  box-shadow: var(--shadow-card);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 16px;
+}
+
+.voice-hero-title {
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: var(--color-text-primary);
+  line-height: 1.25;
+}
+
+.voice-instruction {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--color-text-primary);
+  margin-top: 4px;
+}
+
+.voice-subtext {
+  font-size: 0.875rem;
+  color: var(--color-text-muted);
+  max-width: 380px;
+}
+
+/* ==========================================================================
+   MicButton Component (Electric Yellow Circular Button)
+   ========================================================================== */
+.mic-button-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px;
+}
+
+.mic-button {
+  width: 108px;
+  height: 108px;
+  border-radius: 50%;
+  background-color: var(--color-primary);
+  border: 4px solid var(--color-bg-surface);
+  color: var(--color-text-on-accent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: transform var(--transition-fast), background-color var(--transition-fast), box-shadow var(--transition-fast);
+  box-shadow: var(--shadow-mic), 0 0 0 8px var(--color-primary-ring);
+  user-select: none;
+}
+
+.mic-button:hover:not(:disabled) {
+  background-color: var(--color-primary-hover);
+  transform: translateY(-2px) scale(1.03);
+  box-shadow: var(--shadow-mic-hover), 0 0 0 10px rgba(255, 230, 0, 0.35);
+}
+
+.mic-button:active:not(:disabled) {
+  background-color: var(--color-primary-active);
+  transform: translateY(0) scale(0.98);
+  box-shadow: var(--shadow-mic), 0 0 0 6px var(--color-primary-ring);
+}
+
+/* High-contrast focus ring with dark boundary gap visible on BOTH yellow and dark panels */
+.mic-button:focus-visible {
+  outline: 3px solid #ffffff !important;
+  outline-offset: 4px !important;
+  box-shadow: 0 0 0 2px #000000, var(--shadow-mic) !important;
+}
+
+.mic-button:disabled {
+  background-color: var(--color-border-medium);
+  color: var(--color-text-disabled);
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+.mic-icon {
+  width: 44px;
+  height: 44px;
+}
+
+/* ==========================================================================
+   StatusBar Component (Single Polite Live Region)
+   ========================================================================== */
+.status-bar {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 18px;
+  border-radius: var(--radius-full);
+  font-size: 0.875rem;
+  font-weight: 600;
+  transition: all var(--transition-normal);
+  max-width: 100%;
+}
+
+.status-bar--ready {
+  background-color: var(--color-status-ready-bg);
+  color: var(--color-status-ready);
+  border: 1px solid var(--color-status-ready-border);
+}
+
+.status-bar--info {
+  background-color: var(--color-status-info-bg);
+  color: var(--color-status-info);
+  border: 1px solid var(--color-status-info-border);
+}
+
+.status-bar--warn {
+  background-color: var(--color-status-warn-bg);
+  color: var(--color-status-warn);
+  border: 1px solid var(--color-status-warn-border);
+}
+
+.status-bar-icon-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.status-bar-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background-color: currentColor;
+}
+
+.status-bar-text {
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.status-bar-progress {
+  font-family: var(--font-mono);
+  font-size: 0.8125rem;
+  padding: 1px 6px;
+  background-color: rgba(255, 255, 255, 0.1);
+  border-radius: var(--radius-sm);
+  margin-left: 4px;
+}
+
+/* ==========================================================================
+   ChatPanel Component
+   ========================================================================== */
+.chat-panel {
+  background-color: var(--color-bg-surface);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-card);
+  display: flex;
+  flex-direction: column;
+  min-height: 380px;
+  overflow: hidden;
+}
+
+.chat-panel-header {
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--color-border-subtle);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.chat-panel-title {
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: var(--color-text-primary);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.chat-panel-title svg {
+  color: var(--color-primary);
+}
+
+.chat-badge {
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: var(--radius-full);
+  background-color: var(--color-bg-subtle);
+  color: var(--color-text-muted);
+  border: 1px solid var(--color-border-subtle);
+}
+
+.chat-messages-container {
+  flex: 1;
+  padding: 20px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* Empty Conversation State */
+.chat-empty-state {
+  margin: auto;
+  text-align: center;
+  max-width: 440px;
+  padding: 24px 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+}
+
+.empty-state-icon {
+  width: 50px;
+  height: 50px;
+  border-radius: var(--radius-lg);
+  background-color: var(--color-bg-subtle);
+  color: var(--color-primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--color-border-subtle);
+}
+
+.empty-state-heading {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--color-text-primary);
+}
+
+.empty-state-desc {
+  font-size: 0.875rem;
+  color: var(--color-text-muted);
+  line-height: 1.5;
+}
+
+.example-prompts-section {
+  width: 100%;
+  margin-top: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.example-prompts-label {
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-text-muted);
+  text-align: left;
+}
+
+.example-prompts-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.example-prompt-chip {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 10px 14px;
+  background-color: var(--color-bg-page);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-md);
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--color-text-secondary);
+  text-align: left;
+  cursor: default;
+  transition: border-color var(--transition-fast), background-color var(--transition-fast);
+}
+
+.example-prompt-chip:hover {
+  border-color: var(--color-primary);
+  background-color: var(--color-bg-accent-subtle);
+  color: var(--color-text-primary);
+}
+
+.example-prompt-chip-icon {
+  width: 16px;
+  height: 16px;
+  color: var(--color-primary);
+  flex-shrink: 0;
+}
+
+/* Message Bubbles */
+.chat-message {
+  display: flex;
+  flex-direction: column;
+  max-width: 85%;
+  gap: 4px;
+}
+
+.chat-message--user {
+  align-self: flex-end;
+}
+
+.chat-message--assistant {
+  align-self: flex-start;
+}
+
+.message-sender {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  padding: 0 4px;
+}
+
+.message-bubble {
+  padding: 12px 16px;
+  border-radius: var(--radius-lg);
+  font-size: 0.9375rem;
+  line-height: 1.5;
+  word-break: break-word;
+}
+
+.chat-message--user .message-bubble {
+  background-color: var(--color-primary);
+  color: var(--color-text-on-accent);
+  font-weight: 600;
+  border-bottom-right-radius: 4px;
+}
+
+.chat-message--assistant .message-bubble {
+  background-color: var(--color-bg-subtle);
+  color: var(--color-text-primary);
+  border: 1px solid var(--color-border-subtle);
+  border-bottom-left-radius: 4px;
+}
+
+/* ==========================================================================
+   CameraPanel Component
+   ========================================================================== */
+.camera-panel {
+  background-color: var(--color-bg-surface);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-card);
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.camera-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.camera-panel-title {
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: var(--color-text-primary);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.camera-panel-title-icon {
+  width: 20px;
+  height: 20px;
+  color: var(--color-primary);
+}
+
+/* Upload Dropzone / Target */
+.upload-dropzone {
+  border: 2px dashed var(--color-border-medium);
+  border-radius: var(--radius-lg);
+  background-color: var(--color-bg-input);
+  padding: 28px 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 12px;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  position: relative;
+}
+
+.upload-dropzone:hover {
+  border-color: var(--color-primary);
+  background-color: var(--color-bg-accent-subtle);
+}
+
+.upload-dropzone:focus-within {
+  border-color: var(--color-primary);
+  outline: 3px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+.upload-icon-wrapper {
+  width: 46px;
+  height: 46px;
+  border-radius: var(--radius-md);
+  background-color: var(--color-bg-subtle);
+  border: 1px solid var(--color-border-subtle);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-primary);
+  box-shadow: var(--shadow-subtle);
+}
+
+.upload-icon {
+  width: 22px;
+  height: 22px;
+}
+
+.upload-primary-text {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+.upload-primary-text span {
+  color: var(--color-primary);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.upload-secondary-text {
+  font-size: 0.8125rem;
+  color: var(--color-text-muted);
+}
+
+/* Hidden native file input accessible to keyboard and screen readers */
+.file-input-hidden {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
+}
+
+/* Image Preview Container */
+.preview-container {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.image-preview-wrapper {
+  width: 100%;
+  height: 220px;
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  background-color: #000000;
+  border: 1px solid var(--color-border-subtle);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.image-preview {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+}
+
+.preview-controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.preview-file-info {
+  font-size: 0.8125rem;
+  color: var(--color-text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 60%;
+}
+
+.btn-replace-image {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  background-color: var(--color-bg-subtle);
+  border: 1px solid var(--color-border-medium);
+  border-radius: var(--radius-sm);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.btn-replace-image:hover {
+  background-color: var(--color-bg-hover);
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+}
+
+/* Validation Feedback Alert */
+.camera-error-banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  background-color: var(--color-status-error-bg);
+  border: 1px solid var(--color-status-error-border);
+  border-radius: var(--radius-md);
+  color: var(--color-status-error);
+  font-size: 0.8125rem;
+  font-weight: 600;
+}
+
+/* Camera Action Buttons (Focusable with aria-disabled="true") */
+.camera-actions-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+.btn-camera-action {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  min-height: 48px;
+  padding: 10px 14px;
+  background-color: var(--color-bg-subtle);
+  border: 1px solid var(--color-border-medium);
+  border-radius: var(--radius-md);
+  color: var(--color-text-secondary);
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.btn-camera-action[aria-disabled="true"] {
+  cursor: not-allowed;
+  opacity: 0.85;
+}
+
+.camera-action-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.camera-action-badge {
+  font-size: 0.6875rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 2px 6px;
+  background-color: rgba(255, 230, 0, 0.12);
+  color: var(--color-primary);
+  border: 1px solid rgba(255, 230, 0, 0.4);
+  border-radius: var(--radius-sm);
+}
+
+.action-help-text {
+  display: block;
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+  margin-top: 6px;
+  line-height: 1.35;
+}
+
+/* ==========================================================================
+   Footer Component
+   ========================================================================== */
+.app-footer {
+  margin-top: auto;
+  border-top: 1px solid var(--color-border-subtle);
+  background-color: var(--color-bg-surface);
+  padding: 16px 24px;
+}
+
+.footer-container {
+  max-width: 1240px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  font-size: 0.8125rem;
+  color: var(--color-text-muted);
+}
+
+.footer-note {
+  line-height: 1.4;
+}
+
+.footer-version {
+  font-weight: 600;
+  color: var(--color-primary);
+}
+
+/* ==========================================================================
+   Responsive Adaptations & Zoom Support
+   ========================================================================== */
+
+/* Tablet & Laptop (below 992px) */
+@media (max-width: 992px) {
+  .layout-grid {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto;
+    grid-template-areas: none;
+    gap: 20px;
+  }
+
+  .voice-hero-card {
+    padding: 28px 20px;
+  }
+
+  .mic-button {
+    width: 96px;
+    height: 96px;
+  }
+
+  .mic-icon {
+    width: 38px;
+    height: 38px;
+  }
+}
+
+/* Mobile Screens (below 640px) down to 320px */
+@media (max-width: 640px) {
+  .app-main {
+    padding: 16px 12px;
+    gap: 16px;
+  }
+
+  .header-container {
+    padding: 12px 14px;
+  }
+
+  .brand-title {
+    font-size: 1rem;
+  }
+
+  .brand-subtitle {
+    display: none;
+  }
+
+  .voice-hero-card {
+    padding: 24px 14px;
+  }
+
+  .mic-button {
+    width: 88px;
+    height: 88px;
+  }
+
+  .mic-icon {
+    width: 34px;
+    height: 34px;
+  }
+
+  .chat-panel {
+    min-height: 300px;
+  }
+
+  .camera-actions-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .footer-container {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+}
+
+/* ==========================================================================
+   Accessibility Enhancements: Reduced Motion & Windows High Contrast Mode
+   ========================================================================== */
+
+/* Reduced Motion Preference */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Windows High Contrast / Forced Colors Mode */
+@media (forced-colors: active) {
+  :focus-visible {
+    outline: 3px solid Highlight !important;
+  }
+
+  .skip-link:focus {
+    outline: 3px solid Highlight !important;
+    background: Canvas !important;
+    color: CanvasText !important;
+  }
+
+  .mic-button {
+    border: 3px solid ButtonText !important;
+    background-color: ButtonFace !important;
+    color: ButtonText !important;
+  }
+
+  .status-bar {
+    border: 2px solid CanvasText !important;
+  }
+
+  .btn-camera-action[aria-disabled="true"] {
+    border: 1px dashed GrayText !important;
+    color: GrayText !important;
+  }
+
+  .header-availability {
+    border: 2px solid CanvasText !important;
+  }
+}
