@@ -104,7 +104,7 @@ export default function ChatPanel({ messages = [] }) {
               className={`chat-message chat-message--${msg.sender === 'user' ? 'user' : 'assistant'}`}
             >
               <span className="message-sender">
-                {msg.sender === 'user' ? 'You' : 'Assistant'}
+                {msg.sender === 'user' ? 'You' : (msg.label || 'Assistant')}
               </span>
               <div className="message-bubble">
                 {msg.text}

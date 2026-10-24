@@ -11,7 +11,15 @@ export default function CameraPanel({
   onImageChange,
   onStatusChange,
   onDescribe,
+  onReadText,
   isDescribing = false,
+  isReadingText = false,
+  isSpeaking = false,
+  isPaused = false,
+  onPauseReading,
+  onResumeReading,
+  onStopReading,
+  statusText = '',
 }) {
   const [selectedFile, setSelectedFile] = useState(null);
   const [previewUrl, setPreviewUrl] = useState(null);
@@ -20,7 +28,9 @@ export default function CameraPanel({
   const fileInputRef = useRef(null);
 
   const hasImage = Boolean(selectedFile);
-  const canDescribe = hasImage && !isDescribing;
+  const isBusy = isDescribing || isReadingText;
+  const canDescribe = hasImage && !isBusy;
+  const canReadText = hasImage && !isBusy;
 
   // Clean up object URLs to prevent memory leaks
   useEffect(() => {
@@ -74,6 +84,44 @@ export default function CameraPanel({
     if (fileInputRef.current) fileInputRef.current.value = '';
     if (onImageChange) onImageChange(null);
     if (onStatusChange) onStatusChange('Image removed. Select an image to get started.');
+  };
+
+  const handleRotateImage = async () => {
+    if (!selectedFile || !previewUrl || isBusy) return;
+    try {
+      const img = new Image();
+      img.src = previewUrl;
+      await new Promise((resolve, reject) => {
+        img.onload = resolve;
+        img.onerror = reject;
+      });
+
+      const canvas = document.createElement('canvas');
+      canvas.width = img.height;
+      canvas.height = img.width;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
+
+      ctx.translate(canvas.width / 2, canvas.height / 2);
+      ctx.rotate((90 * Math.PI) / 180);
+      ctx.drawImage(img, -img.width / 2, -img.height / 2);
+
+      const mimeType = selectedFile.type || 'image/jpeg';
+      const blob = await new Promise((resolve) => canvas.toBlob(resolve, mimeType, 0.95));
+      if (!blob) return;
+
+      const rotatedFile = new File([blob], selectedFile.name, { type: mimeType });
+      const newUrl = URL.createObjectURL(rotatedFile);
+
+      URL.revokeObjectURL(previewUrl);
+      setSelectedFile(rotatedFile);
+      setPreviewUrl(newUrl);
+
+      if (onImageChange) onImageChange(rotatedFile);
+      if (onStatusChange) onStatusChange('Image rotated 90 degrees clockwise.');
+    } catch (err) {
+      console.error('Failed to rotate image:', err);
+    }
   };
 
   const handleTriggerInput = () => {
@@ -165,12 +213,27 @@ export default function CameraPanel({
               <button
                 type="button"
                 className="btn-replace-image"
-                onClick={handleTriggerInput}
-                aria-label="Replace current image"
-                disabled={isDescribing}
+                onClick={handleRotateImage}
+                aria-label="Rotate image 90 degrees clockwise"
+                title="Rotate image 90° clockwise"
+                disabled={isBusy}
               >
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false">
                   <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67" />
+                </svg>
+                Rotate
+              </button>
+              <button
+                type="button"
+                className="btn-replace-image"
+                onClick={handleTriggerInput}
+                aria-label="Replace current image"
+                disabled={isBusy}
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false">
+                  <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+                  <circle cx="8.5" cy="8.5" r="1.5" />
+                  <polyline points="21 15 16 10 5 21" />
                 </svg>
                 Replace
               </button>
@@ -179,7 +242,7 @@ export default function CameraPanel({
                 className="btn-replace-image"
                 onClick={handleClearImage}
                 aria-label="Clear current image"
-                disabled={isDescribing}
+                disabled={isBusy}
               >
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false">
                   <line x1="18" y1="6" x2="6" y2="18" />
@@ -203,7 +266,7 @@ export default function CameraPanel({
               placeholder="Ask a question about this photo (optional)"
               value={question}
               onChange={(e) => setQuestion(e.target.value)}
-              disabled={isDescribing}
+              disabled={isBusy}
               onKeyDown={(e) => {
                 if (e.key === 'Enter') {
                   e.preventDefault();
@@ -259,10 +322,17 @@ export default function CameraPanel({
         <div>
           <button
             type="button"
-            className="btn-camera-action"
-            aria-disabled="true"
+            className={`btn-camera-action ${canReadText ? 'btn-camera-action--active' : ''}`}
+            aria-disabled={!canReadText}
+            aria-busy={isReadingText}
             aria-describedby="read-text-explanation"
-            onClick={(e) => e.preventDefault()}
+            onClick={(e) => {
+              if (canReadText && onReadText) {
+                onReadText(selectedFile);
+              } else {
+                e.preventDefault();
+              }
+            }}
           >
             <span className="camera-action-label">
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false">
@@ -270,15 +340,65 @@ export default function CameraPanel({
                 <line x1="9" y1="20" x2="15" y2="20" />
                 <line x1="12" y1="4" x2="12" y2="20" />
               </svg>
-              Read text
+              {isReadingText ? 'Reading...' : 'Read text'}
             </span>
-            <span className="camera-action-badge" aria-hidden="true">Coming soon</span>
+            <span className="camera-action-badge" aria-hidden="true">
+              {isReadingText ? 'Processing' : (hasImage ? 'Ready' : 'Requires image')}
+            </span>
           </button>
           <span id="read-text-explanation" className="action-help-text">
-            Not available yet. OCR text reading is being prepared.
+            {isReadingText
+              ? (statusText || 'Extracting text from image...')
+              : (hasImage
+                  ? 'Extract and read printed or written text from this photo.'
+                  : 'Select or take a photo first to read text.')}
           </span>
         </div>
       </div>
+
+      {/* Accessible Speech Playback Controls (Pause / Resume / Stop) */}
+      {(isSpeaking || isPaused) && (
+        <div className="speech-controls-group" role="group" aria-label="Speech playback controls">
+          {isSpeaking && !isPaused ? (
+            <button
+              type="button"
+              className="btn-pause-reading"
+              onClick={onPauseReading}
+              aria-label="Pause reading text aloud"
+            >
+              <svg className="speech-control-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                <rect x="6" y="4" width="4" height="16" rx="1" />
+                <rect x="14" y="4" width="4" height="16" rx="1" />
+              </svg>
+              <span>Pause</span>
+            </button>
+          ) : (
+            <button
+              type="button"
+              className="btn-resume-reading"
+              onClick={onResumeReading}
+              aria-label="Resume reading text aloud"
+            >
+              <svg className="speech-control-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                <polygon points="5 3 19 12 5 21 5 3" />
+              </svg>
+              <span>Resume</span>
+            </button>
+          )}
+
+          <button
+            type="button"
+            className="btn-stop-reading"
+            onClick={onStopReading}
+            aria-label="Stop reading text aloud"
+          >
+            <svg className="btn-stop-reading-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+              <rect x="6" y="6" width="12" height="12" rx="2" />
+            </svg>
+            <span>Stop reading</span>
+          </button>
+        </div>
+      )}
     </section>
   );
 }
