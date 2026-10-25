@@ -129,7 +129,7 @@ export function routeCommand(transcript, {
         status: 'ready',
         params: { siteId, url: ALLOWED_SITES[siteId] },
         message: siteId === 'youtube'
-          ? (language === 'hi-IN' ? 'यूट्यूब खोला जा रहा है।' : 'యూట్యూబ్ తెరుస్తున్నాను.' )
+          ? (language === 'hi-IN' ? 'यूट्यूब खोला जा रहा है।' : 'యూట్యూబ్ తెరుస్తున్నాను.')
           : (language === 'hi-IN' ? 'गूगल खोला जा रहा है।' : 'గూగుల్ తెరుస్తున్నాను.'),
       };
     }
@@ -148,7 +148,7 @@ export function routeCommand(transcript, {
 
   if (siteMatch) {
     const siteId = siteMatch[1];
-    const isNewTab = /new tab|new window|in a tab|in tab/.test(command) || true;
+    const isNewTab = /new tab|new window|in a tab|in tab/.test(command);
     const tabSuffix = /new tab|new window/.test(command) ? ' in a new tab' : '';
     return {
       action: 'open_site',
