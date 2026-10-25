@@ -10,6 +10,8 @@ import { speakText as speakSpeechOutput, stopSpeaking as stopSpeechOutput } from
 import { speakText, stopSpeaking, pauseSpeaking, resumeSpeaking } from './voice/speak';
 import { openAllowedSite, routeCommand } from './actions/commandRouter';
 import { isTextGroundedQuestion, answerImageQuestion } from './ai/qa';
+import HandsFreeControl from './components/HandsFreeControl';
+import { useHandsFree } from './voice/useHandsFree';
 
 const VOICE_LANGUAGES = [
   { value: 'en-IN', label: 'English (India)' },
@@ -50,6 +52,7 @@ export default function App() {
   // Webcam refs — CameraPanel writes into these so voice commands can access the camera
   const captureFrameRef = useRef(null);
   const isCameraActiveRef = useRef(false);
+  const startCameraRef = useRef(null);
 
   useEffect(() => () => {
     stopSpeechRecognition();
@@ -83,13 +86,125 @@ export default function App() {
     }
   };
 
+  const executeCommand = async (transcript) => {
+    if (!transcript || !transcript.trim()) return;
+
+    // Check if either an uploaded image, active camera, or callable camera starter is available
+    const canUseCamera = Boolean(startCameraRef.current) || isCameraActiveRef.current;
+
+    const result = routeCommand(transcript, {
+      hasImage: Boolean(selectedImage),
+      canUseCamera,
+      visionAvailable: typeof describeImage === 'function',
+      ocrAvailable: typeof readText === 'function',
+      language: selectedLanguage,
+    });
+
+    if (result.action === 'describe_image' && result.status === 'ready') {
+      // 1. Uploaded image has top priority
+      let imageToProcess = selectedImage;
+
+      // 2. Otherwise automatically start camera if needed and capture exactly one frame
+      if (!imageToProcess) {
+        if (!isCameraActiveRef.current && startCameraRef.current) {
+          setStatus('Activating camera...');
+          try {
+            await startCameraRef.current();
+          } catch (err) {
+            const errNotice = err.message || 'Camera permission denied or camera unavailable.';
+            setStatus(errNotice);
+            await speakResponse('Camera could not be started. Please allow camera access or upload an image.', 'Camera startup failed.');
+            return;
+          }
+        }
+        if (captureFrameRef.current) {
+          setStatus('Capturing frame from camera...');
+          imageToProcess = await captureFrameRef.current();
+        }
+      }
+
+      if (imageToProcess) {
+        await handleDescribeImage(imageToProcess, transcript);
+      } else {
+        setStatus('Could not capture a frame from the camera.');
+        await speakResponse('Could not capture a frame from the camera. Please make sure the camera is running.', 'Camera capture failed.');
+      }
+      return;
+    }
+
+    if (result.action === 'read_text' && result.status === 'ready') {
+      // 1. Uploaded image has top priority
+      let imageToProcess = selectedImage;
+
+      // 2. Otherwise automatically start camera if needed and capture exactly one frame
+      if (!imageToProcess) {
+        if (!isCameraActiveRef.current && startCameraRef.current) {
+          setStatus('Activating camera...');
+          try {
+            await startCameraRef.current();
+          } catch (err) {
+            const errNotice = err.message || 'Camera permission denied or camera unavailable.';
+            setStatus(errNotice);
+            await speakResponse('Camera could not be started. Please allow camera access or upload an image.', 'Camera startup failed.');
+            return;
+          }
+        }
+        if (captureFrameRef.current) {
+          setStatus('Capturing frame from camera...');
+          imageToProcess = await captureFrameRef.current();
+        }
+      }
+
+      if (imageToProcess) {
+        await handleReadText(imageToProcess);
+      } else {
+        setStatus('Could not capture a frame from the camera.');
+        await speakResponse('Could not capture a frame from the camera. Please make sure the camera is running.', 'Camera capture failed.');
+      }
+      return;
+    }
+
+    addMessage('user', transcript);
+    addMessage('assistant', result.message);
+
+    if (result.action === 'open_site' && result.status === 'ready') {
+      await speakResponse(result.message, 'Command completed successfully.');
+      openAllowedSite(result.params.siteId);
+    } else {
+      const completionStatus = result.status === 'unavailable'
+        ? 'Feature unavailable.'
+        : result.status === 'needs_input'
+          ? 'Image needed.'
+          : 'Response ready.';
+      await speakResponse(result.message, completionStatus);
+    }
+  };
+
+  const {
+    handsFreeState,
+    isEnabled: isHandsFreeEnabled,
+    errorMessage: handsFreeError,
+    toggleHandsFree,
+    pauseForManualMic,
+    resumeAfterManualMic,
+  } = useHandsFree({
+    selectedLanguage,
+    isSpeaking,
+    isManualListening: isListening,
+    onExecuteCommand: executeCommand,
+    onStatusChange: setStatus,
+  });
+
   const handleMicClick = async () => {
     if (isListening) {
-      stopSpeechRecognition();
-      setStatus('Stopping speech recognition...');
+      await stopSpeechRecognition();
+      setStatus('Speech recognition stopped.');
       return;
     }
     if (isProcessingVoice || isDescribing || isReadingText) return;
+
+    // Temporarily pause hands-free recognition and await full release of the microphone
+    await pauseForManualMic();
 
     stopSpeechOutput();
     stopSpeaking();
@@ -105,59 +220,17 @@ export default function App() {
       setIsListening(false);
       setIsProcessingVoice(true);
 
-      // Check if either an uploaded image OR a live camera feed is available
-      const hasImageSource = Boolean(selectedImage) || isCameraActiveRef.current;
-
-      const result = routeCommand(transcript, {
-        hasImage: hasImageSource,
-        visionAvailable: typeof describeImage === 'function',
-        ocrAvailable: typeof readText === 'function',
-        language: selectedLanguage,
-      });
-
-      if (result.action === 'describe_image' && result.status === 'ready') {
-        // Use uploaded image if available; otherwise capture one frame from webcam
-        let imageToProcess = selectedImage;
-        if (!imageToProcess && isCameraActiveRef.current && captureFrameRef.current) {
-          imageToProcess = await captureFrameRef.current();
-        }
-        if (imageToProcess) {
-          await handleDescribeImage(imageToProcess, transcript);
-        } else {
-          setStatus('Could not capture a frame from the camera.');
-        }
-        return;
-      }
-
-      if (result.action === 'read_text' && result.status === 'ready') {
-        let imageToProcess = selectedImage;
-        if (!imageToProcess && isCameraActiveRef.current && captureFrameRef.current) {
-          imageToProcess = await captureFrameRef.current();
-        }
-        if (imageToProcess) {
-          await handleReadText(imageToProcess);
-        } else {
-          setStatus('Could not capture a frame from the camera.');
-        }
-        return;
-      }
-
-      addMessage('user', transcript);
-      addMessage('assistant', result.message);
-
-      if (result.action === 'open_site' && result.status === 'ready') {
-        await speakResponse(result.message, 'Command completed successfully.');
-        openAllowedSite(result.params.siteId);
-      } else {
-        const completionStatus = result.status === 'unavailable'
-          ? 'Feature unavailable.'
-          : result.status === 'needs_input'
-            ? 'Image needed.'
-            : 'Response ready.';
-        await speakResponse(result.message, completionStatus);
-      }
+      await executeCommand(transcript);
     } catch (error) {
       setIsListening(false);
+      if (error.code === 'aborted') {
+        setStatus('Speech recognition stopped.');
+        return;
+      }
+      if (error.code === 'no-speech') {
+        setStatus('No speech detected. Activate the microphone to try again.');
+        return;
+      }
       const errorMessage = error.message || 'Speech recognition failed. Please try again.';
       setStatus(error.code === 'unsupported'
         ? 'Speech recognition is not available in this browser. Try Chrome or Edge.'
@@ -165,6 +238,8 @@ export default function App() {
     } finally {
       setIsListening(false);
       setIsProcessingVoice(false);
+      // Resume hands-free if it was enabled
+      resumeAfterManualMic();
     }
   };
 
@@ -266,19 +341,23 @@ export default function App() {
 
           addMessage('assistant', groundedAnswer);
 
-          speakText(groundedAnswer, {
-            onStart: () => {
-              setIsSpeaking(true);
-              setIsPaused(false);
-            },
-            onEnd: () => {
-              setIsSpeaking(false);
-              setIsPaused(false);
-            },
-            onError: () => {
-              setIsSpeaking(false);
-              setIsPaused(false);
-            },
+          await new Promise((resolve) => {
+            speakText(groundedAnswer, {
+              onStart: () => {
+                setIsSpeaking(true);
+                setIsPaused(false);
+              },
+              onEnd: () => {
+                setIsSpeaking(false);
+                setIsPaused(false);
+                resolve();
+              },
+              onError: () => {
+                setIsSpeaking(false);
+                setIsPaused(false);
+                resolve();
+              },
+            });
           });
           return;
         }
@@ -307,19 +386,23 @@ export default function App() {
       addMessage('assistant', response);
 
       if (description) {
-        speakText(description, {
-          onStart: () => {
-            setIsSpeaking(true);
-            setIsPaused(false);
-          },
-          onEnd: () => {
-            setIsSpeaking(false);
-            setIsPaused(false);
-          },
-          onError: () => {
-            setIsSpeaking(false);
-            setIsPaused(false);
-          },
+        await new Promise((resolve) => {
+          speakText(description, {
+            onStart: () => {
+              setIsSpeaking(true);
+              setIsPaused(false);
+            },
+            onEnd: () => {
+              setIsSpeaking(false);
+              setIsPaused(false);
+              resolve();
+            },
+            onError: () => {
+              setIsSpeaking(false);
+              setIsPaused(false);
+              resolve();
+            },
+          });
         });
       }
     } catch (err) {
@@ -407,19 +490,23 @@ export default function App() {
       addMessage('assistant', formattedText, 'Text found in image');
 
       // 4. Speak recognized text sequentially with chunking
-      speakText(text, {
-        onStart: () => {
-          setIsSpeaking(true);
-          setIsPaused(false);
-        },
-        onEnd: () => {
-          setIsSpeaking(false);
-          setIsPaused(false);
-        },
-        onError: () => {
-          setIsSpeaking(false);
-          setIsPaused(false);
-        },
+      await new Promise((resolve) => {
+        speakText(text, {
+          onStart: () => {
+            setIsSpeaking(true);
+            setIsPaused(false);
+          },
+          onEnd: () => {
+            setIsSpeaking(false);
+            setIsPaused(false);
+            resolve();
+          },
+          onError: () => {
+            setIsSpeaking(false);
+            setIsPaused(false);
+            resolve();
+          },
+        });
       });
     } catch (err) {
       console.error('OCR recognition error:', err);
@@ -482,10 +569,24 @@ export default function App() {
 
             <div className="voice-card-content-col">
               <h2 id="voice-heading" className="voice-hero-title">
-                {isListening ? 'Listening now...' : 'Ready when you are'}
+                {isListening
+                  ? 'Listening now...'
+                  : handsFreeState === 'waiting-for-wake-word'
+                    ? 'Listening for “Hey Companion”'
+                    : handsFreeState === 'listening-for-command'
+                      ? 'Listening for command...'
+                      : handsFreeState === 'processing-command'
+                        ? 'Processing command...'
+                        : 'Ready when you are'}
               </h2>
               <p className="voice-instruction">
-                {isListening ? 'Speak a command or ask a question.' : 'Start voice input, or use the message field below.'}
+                {isListening
+                  ? 'Speak a command or ask a question.'
+                  : handsFreeState === 'waiting-for-wake-word'
+                    ? 'Say “Hey Companion” followed by “Describe this image” or “Read text”.'
+                    : handsFreeState === 'listening-for-command'
+                      ? 'Say “Describe this image”, “Read text”, or “Open YouTube”.'
+                      : 'Start voice input, or use hands-free mode on the right.'}
               </p>
               <p className="voice-subtext">
                 The microphone button starts and stops listening. Speech is handled by your browser.
@@ -505,7 +606,7 @@ export default function App() {
                   id="voice-language"
                   value={selectedLanguage}
                   onChange={(event) => setSelectedLanguage(event.target.value)}
-                  disabled={isListening || isProcessingVoice || isDescribing || isReadingText}
+                  disabled={isListening || isProcessingVoice || isDescribing || isReadingText || isHandsFreeEnabled}
                 >
                   {VOICE_LANGUAGES.map((language) => (
                     <option key={language.value} value={language.value}>{language.label}</option>
@@ -521,6 +622,14 @@ export default function App() {
               >
                 Stop speech
               </button>
+
+              <HandsFreeControl
+                handsFreeState={handsFreeState}
+                isEnabled={isHandsFreeEnabled}
+                onToggle={toggleHandsFree}
+                disabled={isProcessingVoice || isDescribing || isReadingText}
+                errorMessage={handsFreeError}
+              />
             </div>
           </section>
 
@@ -540,6 +649,7 @@ export default function App() {
             statusText={status}
             captureFrameRef={captureFrameRef}
             isCameraActiveRef={isCameraActiveRef}
+            startCameraRef={startCameraRef}
           />
 
           {/* 3. Conversation Panel Section (DOM Order: Third in main) */}

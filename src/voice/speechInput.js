@@ -1,14 +1,14 @@
-function getRecognitionConstructor() {
+export function getRecognitionConstructor() {
   return globalThis.SpeechRecognition || globalThis.webkitSpeechRecognition || null;
 }
 
-function createRecognitionError(code, message) {
+export function createRecognitionError(code, message) {
   const error = new Error(message);
   error.code = code;
   return error;
 }
 
-function getRecognitionError(errorCode) {
+export function getRecognitionError(errorCode) {
   const errors = {
     'not-allowed': ['permission-denied', 'Microphone permission was denied. Allow microphone access and try again.'],
     'service-not-allowed': ['permission-denied', 'The browser did not allow speech recognition. Check microphone permissions.'],
@@ -26,6 +26,14 @@ function getRecognitionError(errorCode) {
 
 let activeRecognition = null;
 
+export function getActiveRecognition() {
+  return activeRecognition;
+}
+
+export function setActiveRecognition(rec) {
+  activeRecognition = rec;
+}
+
 /** Returns whether this browser exposes the Web Speech recognition API. */
 export function isSpeechRecognitionSupported() {
   return typeof getRecognitionConstructor() === 'function';
@@ -39,7 +47,7 @@ export function isSpeechRecognitionSupported() {
  * @param {{ lang?: string, interimResults?: boolean, continuous?: boolean }} [options]
  * @returns {Promise<string>}
  */
-export function startSpeechRecognition({
+export async function startSpeechRecognition({
   lang = 'en-US',
   interimResults = false,
   continuous = false,
@@ -52,11 +60,9 @@ export function startSpeechRecognition({
     ));
   }
 
+  // If another recognition session is active, stop it cleanly and await microphone release
   if (activeRecognition) {
-    return Promise.reject(createRecognitionError(
-      'already-active',
-      'Speech recognition is already listening.',
-    ));
+    await stopSpeechRecognition();
   }
 
   let recognition;
@@ -121,14 +127,37 @@ export function startSpeechRecognition({
   });
 }
 
-/** Stops the current recognition session. Returns false if it is not listening. */
+/**
+ * Stops the current recognition session.
+ * Resolves once the browser has safely closed the session and released the microphone.
+ */
 export function stopSpeechRecognition() {
-  if (!activeRecognition) return false;
+  const rec = activeRecognition;
+  if (!rec) return Promise.resolve(false);
 
-  try {
-    activeRecognition.stop();
-  } catch {
-    activeRecognition.abort();
-  }
-  return true;
+  return new Promise((resolve) => {
+    activeRecognition = null;
+    let finished = false;
+
+    const done = () => {
+      if (finished) return;
+      finished = true;
+      resolve(true);
+    };
+
+    rec.onend = done;
+
+    try {
+      rec.stop();
+    } catch {
+      try {
+        rec.abort();
+      } catch {
+        done();
+      }
+    }
+
+    // Safety timeout in case browser does not fire onend
+    setTimeout(done, 250);
+  });
 }

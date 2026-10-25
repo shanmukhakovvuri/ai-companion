@@ -39,30 +39,35 @@ const localizedCommands = {
 };
 
 function normalizeCommand(text) {
-  return typeof text === 'string'
-    ? text.toLowerCase().replace(/[^\p{L}\p{M}\p{N}\s]/gu, ' ').replace(/\s+/g, ' ').trim()
-    : '';
+  if (typeof text !== 'string') return '';
+  let normalized = text.toLowerCase().replace(/[^\p{L}\p{M}\p{N}\s]/gu, ' ').replace(/\s+/g, ' ').trim();
+  // Strip optional leading wake phrase so commands route cleanly with or without the wake phrase prefix
+  normalized = normalized.replace(/^(?:hey|okay|ok)\s+companion\s+/, '');
+  return normalized;
 }
 
 function isDescribeCommand(command) {
   return [
-    /^(?:please )?(?:describe|explain)(?: (?:this|the|that))?(?: (?:image|photo|picture|scene|surroundings))?$/,
-    /^(?:please )?(?:what is in|whats in|what can you see in|tell me what you see in|identify)(?: (?:this|the|that))?(?: (?:image|photo|picture|scene|surroundings))?$/,
-    /^(?:please )?(?:describe something in front of me|what is in front of me|whats in front of me)$/,
+    /^(?:please )?(?:can you |could you )?(?:describe|explain)(?: (?:this|the|that))?(?: (?:image|photo|picture|scene|surroundings))?$/,
+    /^(?:please )?(?:can you |could you )?(?:describe|tell me|explain) what (?:you see|is in front of me|is there)$/,
+    /^(?:please )?(?:can you |could you )?(?:what is in|whats in|what can you see in|tell me what you see in|identify|what is|whats)(?: (?:this|the|that))?(?: (?:image|photo|picture|scene|surroundings))?$/,
+    /^(?:please )?(?:describe something in front of me|what is in front of me|whats in front of me|what do you see|what can you see)$/,
   ].some((pattern) => pattern.test(command));
 }
 
 function isReadTextCommand(command) {
   return [
-    /^(?:please )?(?:read|extract)(?: the)? text$/,
-    /^(?:please )?(?:read|extract)(?: the)? text (?:from|in|on) (?:(?:this|the|that|a|an) )?(?:image|photo|picture|sign|document)$/,
-    /^(?:please )?read (?:this|the|that) (?:image|photo|picture|sign|document)$/,
-    /^(?:please )?read (?:this|the|that) text$/,
+    /^(?:please )?(?:can you |could you )?(?:read|extract)(?: the)? text$/,
+    /^(?:please )?(?:can you |could you )?(?:read|extract)(?: the)? text (?:from|in|on) (?:(?:this|the|that|a|an) )?(?:image|photo|picture|sign|document)$/,
+    /^(?:please )?(?:can you |could you )?read (?:this|the|that) (?:image|photo|picture|sign|document)$/,
+    /^(?:please )?(?:can you |could you )?read (?:this|the|that) text$/,
+    /^(?:please )?(?:can you |could you )?read (?:the )?text from (?:this|the|that) (?:image|photo|picture|sign|document)$/,
   ].some((pattern) => pattern.test(command));
 }
 
 function imageActionResult(action, options, messages) {
-  if (!options.hasImage) {
+  const hasSource = options.hasImage || options.canUseCamera;
+  if (!hasSource) {
     return {
       action,
       status: 'needs_input',
@@ -93,11 +98,12 @@ function imageActionResult(action, options, messages) {
  * Image actions only return requests; this function does not run AI or OCR.
  *
  * @param {string} transcript
- * @param {{ hasImage?: boolean, visionAvailable?: boolean, ocrAvailable?: boolean, language?: string }} [options]
+ * @param {{ hasImage?: boolean, canUseCamera?: boolean, visionAvailable?: boolean, ocrAvailable?: boolean, language?: string }} [options]
  * @returns {{ action: string, status: string, params: object, message: string }}
  */
 export function routeCommand(transcript, {
   hasImage = false,
+  canUseCamera = false,
   visionAvailable = true,
   ocrAvailable = false,
   language = 'en-IN',
@@ -128,10 +134,10 @@ export function routeCommand(transcript, {
       };
     }
     if (localized.describe.some((phrase) => command.includes(phrase))) {
-      return imageActionResult('describe_image', { hasImage, available: visionAvailable }, messages);
+      return imageActionResult('describe_image', { hasImage, canUseCamera, available: visionAvailable }, messages);
     }
     if (localized.readText.some((phrase) => command.includes(phrase))) {
-      return imageActionResult('read_text', { hasImage, available: ocrAvailable }, messages);
+      return imageActionResult('read_text', { hasImage, canUseCamera, available: ocrAvailable }, messages);
     }
   }
 
@@ -156,6 +162,7 @@ export function routeCommand(transcript, {
   if (isDescribeCommand(command)) {
     return imageActionResult('describe_image', {
       hasImage,
+      canUseCamera,
       available: visionAvailable,
     }, messages);
   }
@@ -163,6 +170,7 @@ export function routeCommand(transcript, {
   if (isReadTextCommand(command)) {
     return imageActionResult('read_text', {
       hasImage,
+      canUseCamera,
       available: ocrAvailable,
     }, messages);
   }
