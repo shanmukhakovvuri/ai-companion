@@ -1,41 +1,41 @@
 /* ==========================================================================
    Personal AI Companion - Design System & Component Styles
-   Framer-Inspired Charcoal & Warm Yellow Palette
+  Deep Navy Glass & Lavender / Gold Palette
    WCAG AAA Compliant | Screen-Reader Friendly | Desktop & Mobile Responsive
    ========================================================================== */
 
 :root {
-  /* Surface and Background Colors (Framer Charcoal & Dark Neutral) */
-  --color-bg-page: #111212;
-  --color-bg-surface: #1b1d1d;
-  --color-bg-subtle: #242626;
-  --color-bg-hover: #2e3030;
-  --color-bg-input: #151616;
-  --color-bg-accent-subtle: rgba(244, 211, 94, 0.08);
+  /* Deep navy surfaces with cool glass highlights */
+  --color-bg-page: #090e1d;
+  --color-bg-surface: rgba(18, 27, 51, 0.9);
+  --color-bg-subtle: rgba(31, 43, 73, 0.86);
+  --color-bg-hover: rgba(44, 58, 94, 0.94);
+  --color-bg-input: rgba(8, 14, 29, 0.9);
+  --color-bg-accent-subtle: rgba(167, 139, 250, 0.1);
 
-  /* Typography Colors (Off-white headings and muted soft gray) */
-  --color-text-primary: #f7f7f0;
-  --color-text-secondary: #dcdfdc;
-  --color-text-muted: #b9bdb8;
-  --color-text-disabled: #6b6e6c;
-  --color-text-on-accent: #111212;
+  /* High-contrast cool white typography */
+  --color-text-primary: #f5f7ff;
+  --color-text-secondary: #e0e6f7;
+  --color-text-muted: #b2bfd9;
+  --color-text-disabled: #8995ae;
+  --color-text-on-accent: #161629;
 
-  /* Primary Accent: Warm Yellow (#f4d35e) */
-  --color-primary: #f4d35e;
-  --color-primary-hover: #f7dc7b;
-  --color-primary-active: #e6be3d;
-  --color-primary-subtle: rgba(244, 211, 94, 0.12);
-  --color-primary-ring: rgba(244, 211, 94, 0.35);
-  --color-primary-border: rgba(244, 211, 94, 0.5);
+  /* Gold primary with lavender and blue secondary accents */
+  --color-primary: #f1d28b;
+  --color-primary-hover: #f8dfa8;
+  --color-primary-active: #dfbd70;
+  --color-primary-subtle: rgba(241, 210, 139, 0.12);
+  --color-primary-ring: rgba(177, 157, 255, 0.28);
+  --color-primary-border: rgba(190, 174, 255, 0.52);
 
   /* Semantic Status Tokens (Accessible on Dark Charcoal Surfaces) */
   --color-status-ready: #34d399;
   --color-status-ready-bg: rgba(16, 185, 129, 0.15);
   --color-status-ready-border: rgba(52, 211, 153, 0.4);
 
-  --color-status-info: #38bdf8;
-  --color-status-info-bg: rgba(56, 189, 248, 0.15);
-  --color-status-info-border: rgba(56, 189, 248, 0.4);
+  --color-status-info: #c3ccff;
+  --color-status-info-bg: rgba(118, 133, 220, 0.18);
+  --color-status-info-border: rgba(169, 180, 255, 0.4);
 
   --color-status-warn: #f4d35e;
   --color-status-warn-bg: rgba(244, 211, 94, 0.14);
@@ -45,22 +45,22 @@
   --color-status-error-bg: rgba(239, 68, 68, 0.15);
   --color-status-error-border: rgba(248, 113, 113, 0.4);
 
-  /* Borders & Dividers (Subtle charcoal borders) */
-  --color-border-subtle: #292b2b;
-  --color-border-medium: #3c3f3d;
-  --color-border-strong: #545755;
+  /* Fine blue-violet glass borders */
+  --color-border-subtle: rgba(178, 193, 237, 0.16);
+  --color-border-medium: rgba(178, 193, 237, 0.3);
+  --color-border-strong: rgba(198, 207, 255, 0.5);
 
-  /* Elevation & Shadows (Restrained and subtle) */
-  --shadow-subtle: 0 1px 3px rgba(0, 0, 0, 0.3);
-  --shadow-card: 0 4px 12px rgba(0, 0, 0, 0.35);
-  --shadow-mic: 0 4px 16px rgba(244, 211, 94, 0.25);
-  --shadow-mic-hover: 0 6px 20px rgba(244, 211, 94, 0.35);
+  /* Soft elevation with restrained cool and gold light */
+  --shadow-subtle: 0 4px 12px rgba(2, 5, 16, 0.28);
+  --shadow-card: 0 18px 48px rgba(2, 5, 18, 0.34);
+  --shadow-mic: 0 8px 24px rgba(241, 210, 139, 0.2);
+  --shadow-mic-hover: 0 10px 30px rgba(241, 210, 139, 0.3);
 
   /* Radii */
   --radius-sm: 6px;
   --radius-md: 10px;
-  --radius-lg: 16px;
-  --radius-xl: 20px;
+  --radius-lg: 14px;
+  --radius-xl: 16px;
   --radius-full: 9999px;
 
   /* Typography Stack */
@@ -85,6 +85,11 @@ html, body {
   min-height: 100%;
   width: 100%;
   background-color: var(--color-bg-page);
+  background-image:
+    linear-gradient(135deg, rgba(36, 49, 91, 0.24), transparent 42%),
+    linear-gradient(315deg, rgba(76, 58, 126, 0.16), transparent 38%),
+    linear-gradient(180deg, #0a1022 0%, #0b1020 58%, #10152a 100%);
+  background-attachment: fixed;
   color: var(--color-text-primary);
   font-family: var(--font-system);
   font-size: 16px;
@@ -179,8 +184,10 @@ html, body {
    Header Component
    ========================================================================== */
 .app-header {
-  background-color: var(--color-bg-page);
+  background-color: rgba(9, 14, 29, 0.84);
   border-bottom: 1px solid var(--color-border-subtle);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
   position: sticky;
   top: 0;
   z-index: 20;
@@ -211,7 +218,7 @@ html, body {
   font-size: 1.125rem;
   font-weight: 700;
   color: var(--color-text-primary);
-  letter-spacing: -0.01em;
+  letter-spacing: 0;
   line-height: 1.25;
 }
 
@@ -224,9 +231,13 @@ html, body {
 
 /* Plain text preview/connection status indicator */
 .header-preview-status {
+  padding: 6px 10px;
+  border: 1px solid var(--color-border-medium);
+  border-radius: var(--radius-sm);
+  background-color: rgba(27, 37, 65, 0.62);
   font-size: 0.875rem;
   font-weight: 700;
-  color: var(--color-primary);
+  color: #d8d2ff;
   white-space: nowrap;
 }
 
@@ -254,13 +265,13 @@ html, body {
   font-size: 2.375rem;
   font-weight: 700;
   color: var(--color-text-primary);
-  letter-spacing: -0.025em;
+  letter-spacing: 0;
   line-height: 1.15;
 }
 
 .hero-subtitle {
   font-size: 1.0625rem;
-  color: var(--color-text-muted);
+  color: var(--color-text-secondary);
   line-height: 1.5;
   max-width: 680px;
 }
@@ -310,11 +321,13 @@ html, body {
    Mobile: Stacks neatly (Mic top, Heading/Status middle, Controls bottom)
    ========================================================================== */
 .voice-hero-card {
-  background-color: var(--color-bg-surface);
+  background: linear-gradient(118deg, rgba(27, 39, 72, 0.94), rgba(20, 28, 52, 0.88) 52%, rgba(37, 31, 69, 0.86));
   border: 1px solid var(--color-border-subtle);
   border-radius: var(--radius-xl);
   padding: 24px 28px;
   box-shadow: var(--shadow-card);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
   display: flex;
   flex-direction: row;
   align-items: center;
@@ -347,7 +360,7 @@ html, body {
   color: var(--color-text-primary);
   line-height: 1.2;
   margin: 0;
-  letter-spacing: -0.015em;
+  letter-spacing: 0;
 }
 
 .voice-instruction {
@@ -412,14 +425,14 @@ html, body {
   color: var(--color-text-primary);
   font-size: 0.8125rem;
   font-weight: 700;
-  letter-spacing: -0.01em;
+  letter-spacing: 0;
 }
 
 .voice-language-control select {
   width: 100%;
   height: 40px;
   padding: 8px 36px 8px 12px;
-  background-color: #161717;
+  background-color: var(--color-bg-input);
   color: var(--color-text-primary);
   border: 1px solid var(--color-border-medium);
   border-radius: var(--radius-md);
@@ -428,7 +441,7 @@ html, body {
   font-weight: 500;
   cursor: pointer;
   appearance: none;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23b9bdb8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23c3ccff' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
   background-repeat: no-repeat;
   background-position: right 12px center;
   background-size: 16px 16px;
@@ -482,22 +495,22 @@ html, body {
   width: 92px;
   height: 92px;
   border-radius: 50%;
-  background-color: var(--color-primary);
-  border: none;
+  background: linear-gradient(145deg, #f8dfa8, #d9b968);
+  border: 1px solid rgba(255, 243, 207, 0.78);
   color: var(--color-text-on-accent);
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
   transition: transform var(--transition-fast), background-color var(--transition-fast), box-shadow var(--transition-fast);
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4);
+  box-shadow: var(--shadow-mic), 0 0 0 7px rgba(182, 163, 255, 0.12);
   user-select: none;
 }
 
 .mic-button:hover:not(:disabled) {
   background-color: var(--color-primary-hover);
   transform: scale(1.03);
-  box-shadow: 0 6px 18px rgba(244, 211, 94, 0.35);
+  box-shadow: var(--shadow-mic-hover), 0 0 0 8px rgba(182, 163, 255, 0.16);
 }
 
 .mic-button:active:not(:disabled) {
@@ -509,7 +522,7 @@ html, body {
 .mic-button:focus-visible {
   outline: 3px solid #ffffff !important;
   outline-offset: 4px !important;
-  box-shadow: 0 0 0 2px #111212, var(--shadow-mic) !important;
+  box-shadow: 0 0 0 2px #111629, var(--shadow-mic) !important;
 }
 
 .mic-button:disabled {
@@ -536,8 +549,10 @@ html, body {
   border-radius: var(--radius-full);
   font-size: 0.875rem;
   font-weight: 600;
-  transition: all var(--transition-normal);
+  transition: background-color var(--transition-normal), border-color var(--transition-normal), color var(--transition-normal);
   max-width: 100%;
+  background-color: rgba(17, 25, 47, 0.72);
+  border: 1px solid var(--color-border-subtle);
 }
 
 .status-bar--ready {
@@ -572,6 +587,14 @@ html, body {
   background-color: currentColor;
 }
 
+.status-bar[aria-busy="true"] .status-bar-dot {
+  animation: status-pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes status-pulse {
+  50% { opacity: 0.42; }
+}
+
 .status-bar-text {
   font-weight: 600;
   line-height: 1.3;
@@ -590,10 +613,12 @@ html, body {
    ChatPanel Component (Conversation Card matching Framer Reference)
    ========================================================================== */
 .chat-panel {
-  background-color: var(--color-bg-surface);
+  background: linear-gradient(145deg, rgba(20, 30, 56, 0.94), rgba(15, 23, 45, 0.88));
   border: 1px solid var(--color-border-subtle);
   border-radius: var(--radius-xl);
   box-shadow: var(--shadow-card);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
   padding: 24px;
   display: flex;
   flex-direction: column;
@@ -613,7 +638,7 @@ html, body {
   color: var(--color-text-primary);
   line-height: 1.2;
   margin: 0;
-  letter-spacing: -0.015em;
+  letter-spacing: 0;
 }
 
 .chat-panel-subtitle {
@@ -628,7 +653,10 @@ html, body {
   display: flex;
   flex-direction: column;
   gap: 16px;
-  padding: 4px 0;
+  padding: 8px;
+  border: 1px solid rgba(178, 193, 237, 0.12);
+  border-radius: var(--radius-md);
+  background-color: rgba(7, 12, 26, 0.28);
   max-height: 340px;
   overflow-y: auto;
 }
@@ -660,8 +688,8 @@ html, body {
 
 /* User Message: Charcoal rounded bubble */
 .chat-message--user {
-  background-color: var(--color-bg-subtle);
-  border: 1px solid var(--color-border-subtle);
+  background: linear-gradient(120deg, rgba(48, 57, 99, 0.78), rgba(31, 43, 72, 0.82));
+  border: 1px solid rgba(181, 176, 255, 0.2);
   border-radius: var(--radius-lg);
   padding: 14px 16px;
 }
@@ -682,7 +710,7 @@ html, body {
 
 /* Assistant / Companion Message: Yellow left accent line */
 .chat-message--assistant {
-  border-left: 2px solid var(--color-primary);
+  border-left: 2px solid #d9c17e;
   padding: 4px 0 4px 14px;
   background: transparent;
 }
@@ -705,7 +733,7 @@ html, body {
 .chat-speech-status {
   font-size: 0.875rem;
   font-weight: 700;
-  color: var(--color-text-primary);
+  color: #d6d1ff;
   margin-top: 4px;
 }
 
@@ -766,7 +794,7 @@ html, body {
 
 .btn-send-message {
   padding: 10px 18px;
-  background-color: var(--color-primary);
+  background: linear-gradient(135deg, #f5dda6, #e3c578);
   color: var(--color-text-on-accent);
   border: none;
   border-radius: var(--radius-md);
@@ -783,7 +811,7 @@ html, body {
 }
 
 .btn-send-message:focus-visible {
-  outline: 3px solid #ffffff !important;
+  outline: 3px solid #d2c9ff !important;
   outline-offset: 3px !important;
 }
 
@@ -800,14 +828,24 @@ html, body {
   line-height: 1.35;
 }
 
+.chat-generation-status {
+  min-height: 1.35em;
+  color: #d6d1ff;
+  font-size: 0.8125rem;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
 /* ==========================================================================
    CameraPanel Component (Images & Documents matching Framer Reference)
    ========================================================================== */
 .camera-panel {
-  background-color: var(--color-bg-surface);
+  background: linear-gradient(155deg, rgba(21, 31, 58, 0.94), rgba(16, 23, 43, 0.88));
   border: 1px solid var(--color-border-subtle);
   border-radius: var(--radius-xl);
   box-shadow: var(--shadow-card);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
   padding: 24px;
   display: flex;
   flex-direction: column;
@@ -827,7 +865,7 @@ html, body {
   color: var(--color-text-primary);
   line-height: 1.2;
   margin: 0;
-  letter-spacing: -0.015em;
+  letter-spacing: 0;
 }
 
 .camera-panel-subtitle {
@@ -841,9 +879,9 @@ html, body {
 /* Empty State Box matching Framer Reference */
 .camera-empty-box {
   width: 100%;
-  border: 1px dashed var(--color-border-medium);
+  border: 1px dashed rgba(187, 181, 255, 0.48);
   border-radius: var(--radius-md);
-  background-color: var(--color-bg-input);
+  background: linear-gradient(145deg, rgba(15, 23, 45, 0.92), rgba(25, 28, 56, 0.76));
   font: inherit;
   color: inherit;
   padding: 36px 20px;
@@ -858,8 +896,8 @@ html, body {
 }
 
 .camera-empty-box:hover {
-  border-color: var(--color-border-strong);
-  background-color: #181a1a;
+  border-color: #c5b9ff;
+  background: linear-gradient(145deg, rgba(25, 35, 65, 0.96), rgba(34, 33, 71, 0.84));
 }
 
 .camera-empty-box:focus-visible {
@@ -935,7 +973,7 @@ html, body {
   height: 200px;
   border-radius: var(--radius-md);
   overflow: hidden;
-  background-color: #0c0d0d;
+  background-color: rgba(5, 10, 22, 0.88);
   border: 1px solid var(--color-border-subtle);
   display: flex;
   align-items: center;
@@ -1017,7 +1055,7 @@ html, body {
   width: 100%;
   height: 42px;
   padding: 8px 16px;
-  background-color: var(--color-bg-subtle);
+  background: linear-gradient(120deg, rgba(41, 54, 88, 0.94), rgba(32, 39, 72, 0.94));
   border: 1px solid var(--color-border-medium);
   border-radius: var(--radius-md);
   color: var(--color-text-primary);
@@ -1055,7 +1093,7 @@ html, body {
 .btn-image-action {
   height: 38px;
   padding: 6px 10px;
-  background-color: var(--color-bg-subtle);
+  background-color: rgba(27, 38, 65, 0.86);
   border: 1px solid var(--color-border-medium);
   border-radius: var(--radius-md);
   color: var(--color-text-primary);
@@ -1112,8 +1150,9 @@ html, body {
 }
 
 .btn-primary-action--enabled {
-  background-color: var(--color-bg-subtle);
-  border-color: var(--color-border-medium);
+  background-color: rgba(39, 50, 83, 0.9);
+  border-color: rgba(194, 183, 255, 0.46);
+  color: #e0dcff;
 }
 
 .btn-primary-action:focus-visible {
@@ -1146,6 +1185,12 @@ html, body {
   color: var(--color-text-muted);
   margin: 0;
   line-height: 1.4;
+}
+
+.camera-error-banner {
+  background-color: rgba(113, 49, 69, 0.38);
+  border-color: rgba(248, 113, 113, 0.52);
+  color: #ffd5dc;
 }
 
 /* Accessible Speech Controls Group */
@@ -1182,7 +1227,7 @@ html, body {
 .btn-stop-reading:hover {
   background-color: var(--color-bg-hover);
   border-color: var(--color-border-strong);
-  color: #ffffff;
+  color: #e7e2ff;
 }
 
 .btn-pause-reading:focus-visible,

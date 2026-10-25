@@ -6,7 +6,13 @@ import { useState, useEffect, useRef } from 'react';
  * Props:
  * - messages: Array of message objects [{ id, sender: 'user' | 'assistant', text, timestamp, label }]
  */
-export default function ChatPanel({ messages = [] }) {
+export default function ChatPanel({
+  messages = [],
+  onSendMessage,
+  isSending = false,
+  isDisabled = false,
+  chatStatus = '',
+}) {
   const containerRef = useRef(null);
   const [inputText, setInputText] = useState('');
 
@@ -17,6 +23,14 @@ export default function ChatPanel({ messages = [] }) {
   }, [messages]);
 
   const hasMessages = messages.length > 0;
+  const canSend = Boolean(inputText.trim()) && !isSending && !isDisabled;
+
+  const handleSubmit = (event) => {
+    event.preventDefault();
+    if (!canSend || !onSendMessage) return;
+    onSendMessage(inputText.trim());
+    setInputText('');
+  };
 
   return (
     <section className="chat-panel" aria-labelledby="chat-heading">
@@ -43,7 +57,7 @@ export default function ChatPanel({ messages = [] }) {
         {!hasMessages ? (
           <div className="chat-empty-state">
             <p className="chat-empty-text">
-              No messages yet. Start a conversation using the microphone.
+              No messages yet. Start with the microphone or type a message below.
             </p>
           </div>
         ) : (
@@ -64,13 +78,12 @@ export default function ChatPanel({ messages = [] }) {
       </div>
 
       <div className="chat-speech-status">
-        Speech output is available for responses.
+        Spoken replies are available for voice and image actions.
       </div>
 
       <hr className="chat-divider" />
 
-      {/* Message input section (Preview only, awaiting Gemini integration) */}
-      <div className="chat-input-section">
+      <form className="chat-input-section" onSubmit={handleSubmit}>
         <label htmlFor="chat-text-input" className="chat-input-label">
           Or type your message
         </label>
@@ -81,23 +94,33 @@ export default function ChatPanel({ messages = [] }) {
           placeholder="Ask your companion..."
           value={inputText}
           onChange={(event) => setInputText(event.target.value)}
-          aria-describedby="chat-preview-note"
+          onKeyDown={(event) => {
+            if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) {
+              event.preventDefault();
+              event.currentTarget.form?.requestSubmit();
+            }
+          }}
+          disabled={isSending || isDisabled}
+          aria-describedby="chat-input-note chat-status-note"
         />
         <div className="chat-input-actions">
           <button
             type="button"
             className="btn-send-message"
-            disabled
-            aria-disabled="true"
-            title="Message sending is preview-only until Gemini integration is connected"
+            disabled={!canSend}
+            aria-disabled={!canSend}
+            onClick={handleSubmit}
           >
-            Send message
+            {isSending ? 'Generating...' : 'Send message'}
           </button>
         </div>
-        <p id="chat-preview-note" className="chat-input-note">
-          Preview only · Connect to your existing chatbot
+        <p id="chat-input-note" className="chat-input-note">
+          Replies use the Qwen model in your browser. First use downloads about 483 MB on WebGPU or 786 MB on WASM.
         </p>
-      </div>
+        <p id="chat-status-note" className="chat-generation-status" role="status" aria-live="polite" aria-atomic="true" aria-busy={isSending}>
+          {chatStatus || (isSending ? 'Preparing your response...' : '')}
+        </p>
+      </form>
     </section>
   );
 }

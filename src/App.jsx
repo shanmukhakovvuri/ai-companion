@@ -10,6 +10,7 @@ import { speakText as speakSpeechOutput, stopSpeaking as stopSpeechOutput } from
 import { speakText, stopSpeaking, pauseSpeaking, resumeSpeaking } from './voice/speak';
 import { openAllowedSite, routeCommand } from './actions/commandRouter';
 import { isTextGroundedQuestion, answerImageQuestion } from './ai/qa';
+import { generateChatReply, isChatReady } from './ai/chat';
 
 const VOICE_LANGUAGES = [
   { value: 'en-IN', label: 'English (India)' },
@@ -46,6 +47,8 @@ export default function App() {
   const [selectedLanguage, setSelectedLanguage] = useState('en-IN');
   const [isListening, setIsListening] = useState(false);
   const [isProcessingVoice, setIsProcessingVoice] = useState(false);
+  const [isChatSending, setIsChatSending] = useState(false);
+  const [chatStatus, setChatStatus] = useState('');
   const currentOcrCacheRef = useRef(null);
 
   useEffect(() => () => {
@@ -62,6 +65,49 @@ export default function App() {
       label,
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
     }]);
+  };
+
+  const handleSendChatMessage = async (text) => {
+    const prompt = text.trim();
+    if (!prompt || isChatSending || isListening || isDescribing || isReadingText || isProcessingVoice) return;
+
+    const history = messages
+      .filter((message) => message.sender === 'user' || message.sender === 'assistant')
+      .slice(-8)
+      .map((message) => ({
+        role: message.sender,
+        content: message.text,
+      }));
+    history.push({ role: 'user', content: prompt });
+
+    addMessage('user', prompt);
+    setIsChatSending(true);
+    setChatStatus(isChatReady()
+      ? 'Generating a reply with the local model...'
+      : 'Preparing the local Qwen model. First use downloads about 483 MB on WebGPU or 786 MB on WASM.');
+
+    try {
+      const reply = await generateChatReply(history, (update) => {
+        if (update.phase === 'loading') {
+          setChatStatus(typeof update.percent === 'number'
+            ? `Loading local Qwen model: ${update.percent}%`
+            : 'Downloading local Qwen model files (about 483 MB on WebGPU or 786 MB on WASM)...');
+        } else if (update.phase === 'fallback') {
+          setChatStatus(update.message);
+        } else if (update.phase === 'ready') {
+          setChatStatus('Model ready. Generating your reply...');
+        } else if (update.phase === 'generating') {
+          setChatStatus('Generating your reply...');
+        }
+      });
+
+      addMessage('assistant', reply, 'Local Qwen');
+      setChatStatus('Reply generated on this device.');
+    } catch (error) {
+      setChatStatus(`Could not generate a reply: ${error.message || 'Check the model connection and try again.'}`);
+    } finally {
+      setIsChatSending(false);
+    }
   };
 
   const speakResponse = async (text, completionStatus = 'Response ready.') => {
@@ -86,7 +132,7 @@ export default function App() {
       setStatus('Stopping speech recognition...');
       return;
     }
-    if (isProcessingVoice || isDescribing || isReadingText) return;
+    if (isProcessingVoice || isDescribing || isReadingText || isChatSending) return;
 
     stopSpeechOutput();
     stopSpeaking();
@@ -446,7 +492,7 @@ export default function App() {
                 onClick={handleMicClick}
                 label="Start speech recognition"
                 isListening={isListening}
-                disabled={isProcessingVoice || isDescribing || isReadingText}
+                disabled={isProcessingVoice || isDescribing || isReadingText || isChatSending}
               />
             </div>
 
@@ -475,7 +521,7 @@ export default function App() {
                   id="voice-language"
                   value={selectedLanguage}
                   onChange={(event) => setSelectedLanguage(event.target.value)}
-                  disabled={isListening || isProcessingVoice || isDescribing || isReadingText}
+                  disabled={isListening || isProcessingVoice || isDescribing || isReadingText || isChatSending}
                 >
                   {VOICE_LANGUAGES.map((language) => (
                     <option key={language.value} value={language.value}>{language.label}</option>
@@ -510,7 +556,13 @@ export default function App() {
             statusText={status}
           />
           {/* 3. Conversation Panel Section (DOM Order: Third in main) */}
-          <ChatPanel messages={messages} />
+          <ChatPanel
+            messages={messages}
+            onSendMessage={handleSendChatMessage}
+            isSending={isChatSending}
+            isDisabled={isListening || isDescribing || isReadingText || isProcessingVoice}
+            chatStatus={chatStatus}
+          />
         </div>
       </main>
 
