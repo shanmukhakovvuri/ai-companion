@@ -5,6 +5,7 @@ import ChatPanel from './components/ChatPanel';
 import StatusBar from './components/StatusBar';
 import { loadVision, describeImage, isVisionReady } from './ai/vision';
 import { loadOcr, readText, isOcrReady } from './ai/ocr';
+import { loadChat, generateChat, isChatReady } from './ai/chat';
 import { isSpeechRecognitionSupported, startSpeechRecognition, stopSpeechRecognition } from './voice/speechInput';
 import { speakText as speakSpeechOutput, stopSpeaking as stopSpeechOutput } from './voice/speechOutput';
 import { speakText, stopSpeaking, pauseSpeaking, resumeSpeaking } from './voice/speak';
@@ -48,6 +49,10 @@ export default function App() {
   const [isListening, setIsListening] = useState(false);
   const [isProcessingVoice, setIsProcessingVoice] = useState(false);
   const currentOcrCacheRef = useRef(null);
+  const [isGeneratingChat, setIsGeneratingChat] = useState(false);
+  const [chatStatus, setChatStatus] = useState(null);
+  const [chatProgress, setChatProgress] = useState(null);
+  const [chatError, setChatError] = useState(null);
 
   // Webcam refs — CameraPanel writes into these so voice commands can access the camera
   const captureFrameRef = useRef(null);
@@ -88,96 +93,7 @@ export default function App() {
 
   const executeCommand = async (transcript) => {
     if (!transcript || !transcript.trim()) return;
-
-    // Check if either an uploaded image, active camera, or callable camera starter is available
-    const canUseCamera = Boolean(startCameraRef.current) || isCameraActiveRef.current;
-
-    const result = routeCommand(transcript, {
-      hasImage: Boolean(selectedImage),
-      canUseCamera,
-      visionAvailable: typeof describeImage === 'function',
-      ocrAvailable: typeof readText === 'function',
-      language: selectedLanguage,
-    });
-
-    if (result.action === 'describe_image' && result.status === 'ready') {
-      // 1. Uploaded image has top priority
-      let imageToProcess = selectedImage;
-
-      // 2. Otherwise automatically start camera if needed and capture exactly one frame
-      if (!imageToProcess) {
-        if (!isCameraActiveRef.current && startCameraRef.current) {
-          setStatus('Activating camera...');
-          try {
-            await startCameraRef.current();
-          } catch (err) {
-            const errNotice = err.message || 'Camera permission denied or camera unavailable.';
-            setStatus(errNotice);
-            await speakResponse('Camera could not be started. Please allow camera access or upload an image.', 'Camera startup failed.');
-            return;
-          }
-        }
-        if (captureFrameRef.current) {
-          setStatus('Capturing frame from camera...');
-          imageToProcess = await captureFrameRef.current();
-        }
-      }
-
-      if (imageToProcess) {
-        await handleDescribeImage(imageToProcess, transcript);
-      } else {
-        setStatus('Could not capture a frame from the camera.');
-        await speakResponse('Could not capture a frame from the camera. Please make sure the camera is running.', 'Camera capture failed.');
-      }
-      return;
-    }
-
-    if (result.action === 'read_text' && result.status === 'ready') {
-      // 1. Uploaded image has top priority
-      let imageToProcess = selectedImage;
-
-      // 2. Otherwise automatically start camera if needed and capture exactly one frame
-      if (!imageToProcess) {
-        if (!isCameraActiveRef.current && startCameraRef.current) {
-          setStatus('Activating camera...');
-          try {
-            await startCameraRef.current();
-          } catch (err) {
-            const errNotice = err.message || 'Camera permission denied or camera unavailable.';
-            setStatus(errNotice);
-            await speakResponse('Camera could not be started. Please allow camera access or upload an image.', 'Camera startup failed.');
-            return;
-          }
-        }
-        if (captureFrameRef.current) {
-          setStatus('Capturing frame from camera...');
-          imageToProcess = await captureFrameRef.current();
-        }
-      }
-
-      if (imageToProcess) {
-        await handleReadText(imageToProcess);
-      } else {
-        setStatus('Could not capture a frame from the camera.');
-        await speakResponse('Could not capture a frame from the camera. Please make sure the camera is running.', 'Camera capture failed.');
-      }
-      return;
-    }
-
-    addMessage('user', transcript);
-    addMessage('assistant', result.message);
-
-    if (result.action === 'open_site' && result.status === 'ready') {
-      await speakResponse(result.message, 'Command completed successfully.');
-      openAllowedSite(result.params.siteId);
-    } else {
-      const completionStatus = result.status === 'unavailable'
-        ? 'Feature unavailable.'
-        : result.status === 'needs_input'
-          ? 'Image needed.'
-          : 'Response ready.';
-      await speakResponse(result.message, completionStatus);
-    }
+    await handleSendMessage(transcript, { viaVoice: true });
   };
 
   const {
@@ -201,7 +117,7 @@ export default function App() {
       setStatus('Speech recognition stopped.');
       return;
     }
-    if (isProcessingVoice || isDescribing || isReadingText) return;
+    if (isProcessingVoice || isDescribing || isReadingText || isGeneratingChat) return;
 
     // Temporarily pause hands-free recognition and await full release of the microphone
     await pauseForManualMic();
@@ -519,6 +435,180 @@ export default function App() {
     }
   };
 
+  // Conversational AI message handler (both typed messages and conversational speech)
+  const handleSendMessage = async (text, { viaVoice = false } = {}) => {
+    const trimmed = text?.trim();
+    if (!trimmed || isGeneratingChat) return;
+
+    // Check if either an uploaded image, active camera, or callable camera starter is available
+    const canUseCamera = Boolean(startCameraRef.current) || isCameraActiveRef.current;
+
+    // Route explicit commands (describe image, read text, open site)
+    const result = routeCommand(trimmed, {
+      hasImage: Boolean(selectedImage),
+      canUseCamera,
+      visionAvailable: typeof describeImage === 'function',
+      ocrAvailable: typeof readText === 'function',
+      language: selectedLanguage,
+    });
+
+    if (result.action === 'describe_image' && result.status === 'ready') {
+      let imageToProcess = selectedImage;
+      if (!imageToProcess) {
+        if (!isCameraActiveRef.current && startCameraRef.current) {
+          setStatus('Activating camera...');
+          try {
+            await startCameraRef.current();
+          } catch (err) {
+            const errNotice = err.message || 'Camera permission denied or camera unavailable.';
+            setStatus(errNotice);
+            await speakResponse('Camera could not be started. Please allow camera access or upload an image.', 'Camera startup failed.');
+            return;
+          }
+        }
+        if (captureFrameRef.current) {
+          setStatus('Capturing frame from camera...');
+          imageToProcess = await captureFrameRef.current();
+        }
+      }
+
+      if (imageToProcess) {
+        await handleDescribeImage(imageToProcess, trimmed);
+      } else {
+        setStatus('Could not capture a frame from the camera.');
+        await speakResponse('Could not capture a frame from the camera. Please make sure the camera is running.', 'Camera capture failed.');
+      }
+      return;
+    }
+
+    if (result.action === 'read_text' && result.status === 'ready') {
+      let imageToProcess = selectedImage;
+      if (!imageToProcess) {
+        if (!isCameraActiveRef.current && startCameraRef.current) {
+          setStatus('Activating camera...');
+          try {
+            await startCameraRef.current();
+          } catch (err) {
+            const errNotice = err.message || 'Camera permission denied or camera unavailable.';
+            setStatus(errNotice);
+            await speakResponse('Camera could not be started. Please allow camera access or upload an image.', 'Camera startup failed.');
+            return;
+          }
+        }
+        if (captureFrameRef.current) {
+          setStatus('Capturing frame from camera...');
+          imageToProcess = await captureFrameRef.current();
+        }
+      }
+
+      if (imageToProcess) {
+        await handleReadText(imageToProcess);
+      } else {
+        setStatus('Could not capture a frame from the camera.');
+        await speakResponse('Could not capture a frame from the camera. Please make sure the camera is running.', 'Camera capture failed.');
+      }
+      return;
+    }
+
+    if (result.action === 'open_site' && result.status === 'ready') {
+      try {
+        const openRes = openAllowedSite(result.params.siteId, { inNewTab: result.params.inNewTab ?? true });
+        if (openRes.success) {
+          addMessage('user', trimmed);
+          addMessage('assistant', result.message);
+          setStatus('Command completed successfully.');
+          if (viaVoice) {
+            await speakResponse(result.message, 'Command completed successfully.');
+          }
+        } else if (openRes.popupBlocked) {
+          const blockedMsg = `Could not open ${result.params.siteId === 'youtube' ? 'YouTube' : 'Google'} because the browser blocked the popup. Please allow popups for this site, or visit ${openRes.url}`;
+          addMessage('user', trimmed);
+          addMessage('assistant', blockedMsg);
+          setStatus('Popup blocked by browser.');
+          if (viaVoice) {
+            await speakResponse('The browser blocked opening the new tab. Please allow popups.', 'Popup blocked.');
+          }
+        }
+      } catch (err) {
+        const errMsg = `Failed to open website: ${err.message || err}`;
+        addMessage('user', trimmed);
+        addMessage('assistant', errMsg);
+        setStatus(`Error: ${errMsg}`);
+      }
+      return;
+    }
+
+    if (result.status === 'unsupported') {
+      addMessage('user', trimmed);
+      addMessage('assistant', result.message);
+      setStatus('Action unsupported.');
+      if (viaVoice) {
+        await speakResponse(result.message, 'Action unsupported.');
+      }
+      return;
+    }
+
+    if (result.status === 'needs_input') {
+      addMessage('user', trimmed);
+      addMessage('assistant', result.message);
+      setStatus('Image needed.');
+      if (viaVoice) {
+        await speakResponse(result.message, 'Image needed.');
+      }
+      return;
+    }
+
+    // If an image is selected and user asked a grounded question about it
+    if (selectedImage && isTextGroundedQuestion(trimmed)) {
+      await handleDescribeImage(selectedImage, trimmed);
+      return;
+    }
+
+    // Conversational text generation via in-browser model
+    addMessage('user', trimmed);
+    setIsGeneratingChat(true);
+    setChatError(null);
+
+    try {
+      if (!isChatReady()) {
+        setStatus('Loading local AI chat model (Qwen2.5-0.5B)...');
+        setChatStatus('Downloading chat model (first load may take a moment)...');
+        await loadChat((percent) => {
+          setChatProgress(percent);
+          setChatStatus(`Downloading chat model: ${percent}%`);
+          setStatus(`Downloading chat model: ${percent}%`);
+        });
+      }
+
+      setChatProgress(null);
+      setChatStatus('Generating response...');
+      setStatus('Generating response with local AI...');
+
+      const response = await generateChat(trimmed, messages);
+      const answer = response || '(No response generated)';
+
+      addMessage('assistant', answer);
+      setStatus('Response ready.');
+
+      if (viaVoice) {
+        await speakResponse(answer, 'Response ready.');
+      }
+    } catch (err) {
+      console.error('Chat generation error:', err);
+      const errorMsg = err.message || 'Failed to generate response.';
+      setChatError(errorMsg);
+      setStatus(`Error: ${errorMsg}`);
+      addMessage('assistant', `Could not generate response: ${errorMsg}`);
+      if (viaVoice) {
+        await speakResponse(`Could not generate response: ${errorMsg}`, 'Chat error.');
+      }
+    } finally {
+      setIsGeneratingChat(false);
+      setChatStatus(null);
+      setChatProgress(null);
+    }
+  };
+
   return (
     <div className="app-root">
       {/* Skip to Main Content Link for Keyboard and Screen-Reader Users */}
@@ -538,7 +628,7 @@ export default function App() {
 
           {/* Plain preview / connection status indicator */}
           <div className="header-preview-status" aria-hidden="true">
-            Preview · Not connected
+            {isChatReady() ? 'Local AI · Ready' : 'Local AI · In-Browser'}
           </div>
         </div>
       </header>
@@ -563,7 +653,7 @@ export default function App() {
                 onClick={handleMicClick}
                 label="Start speech recognition"
                 isListening={isListening}
-                disabled={isProcessingVoice || isDescribing || isReadingText}
+                disabled={isProcessingVoice || isDescribing || isReadingText || isGeneratingChat}
               />
             </div>
 
@@ -594,8 +684,8 @@ export default function App() {
               {/* Exactly one polite status region on the page */}
               <StatusBar
                 status={status}
-                isLoading={isDescribing || isReadingText || isProcessingVoice}
-                progress={progress}
+                isLoading={isDescribing || isReadingText || isProcessingVoice || isGeneratingChat}
+                progress={progress !== null ? progress : chatProgress}
               />
             </div>
 
@@ -627,7 +717,7 @@ export default function App() {
                 handsFreeState={handsFreeState}
                 isEnabled={isHandsFreeEnabled}
                 onToggle={toggleHandsFree}
-                disabled={isProcessingVoice || isDescribing || isReadingText}
+                disabled={isProcessingVoice || isDescribing || isReadingText || isGeneratingChat}
                 errorMessage={handsFreeError}
               />
             </div>
@@ -653,7 +743,14 @@ export default function App() {
           />
 
           {/* 3. Conversation Panel Section (DOM Order: Third in main) */}
-          <ChatPanel messages={messages} />
+          <ChatPanel
+            messages={messages}
+            onSendMessage={handleSendMessage}
+            isGenerating={isGeneratingChat}
+            chatStatus={chatStatus}
+            chatProgress={chatProgress}
+            chatError={chatError}
+          />
         </div>
       </main>
 

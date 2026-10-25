@@ -853,6 +853,11 @@ html, body {
   word-break: break-word;
 }
 
+.chat-generating-bubble {
+  color: var(--color-primary);
+  font-style: italic;
+}
+
 /* Status line below messages */
 .chat-speech-status {
   font-size: 0.875rem;

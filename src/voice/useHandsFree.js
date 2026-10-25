@@ -413,15 +413,20 @@ export function useHandsFree({
             executeRecognizedCommand(wakeCommand);
             return;
           }
+
+          console.log(`[HandsFree #inst-${instanceId}] Voice question accepted: "${wakeCommand}" (action: unknown) -> forwarding to chatbot`);
+          clearCommandTimeout();
+          notifyStatus(`Question received: "${wakeCommand}". Processing...`);
+          executeRecognizedCommand(wakeCommand);
+          return;
         }
 
         if (hasWakePhrase && (!wakeCommand || wakeCommand.trim().length === 0)) {
-          console.log(`[HandsFree #inst-${instanceId}] Command rejected: wake phrase heard alone without command. Refreshing deadline.`);
-          // User repeated only "Hey Companion" while already in command listening
+          console.log(`[HandsFree #inst-${instanceId}] Wake phrase repeated. Refreshing deadline.`);
           const remaining = commandDeadlineRef.current - Date.now();
           const effectiveTime = Math.max(remaining, 8000);
           scheduleCommandTimeout(effectiveTime);
-          notifyStatus(`“${WAKE_PHRASE}” heard again. Say “Describe this image” or “Read text”...`);
+          notifyStatus(`"${WAKE_PHRASE}" heard. Listening for your question or command...`);
           return;
         }
 
@@ -445,9 +450,11 @@ export function useHandsFree({
           return;
         }
 
-        console.log(`[HandsFree #inst-${instanceId}] Command rejected: "${cleanedCommand}" -> reason: unrouted/unknown action (action: "${routed.action}")`);
-        const remainingSec = Math.max(1, Math.ceil((commandDeadlineRef.current - Date.now()) / 1000));
-        notifyStatus(`Heard “${cleanedCommand}”. Say “Describe this image” or “Read text” (${remainingSec}s remaining)...`);
+        console.log(`[HandsFree #inst-${instanceId}] Voice question accepted: "${cleanedCommand}" (action: unknown) -> forwarding to chatbot`);
+        clearCommandTimeout();
+        notifyStatus(`Question received: "${cleanedCommand}". Processing...`);
+        executeRecognizedCommand(cleanedCommand);
+        return;
       }
     };
 

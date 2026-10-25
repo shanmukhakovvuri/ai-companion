@@ -141,21 +141,54 @@ export function routeCommand(transcript, {
     }
   }
 
+  // 1. Supported site navigation (e.g., "Open YouTube in a new tab", "Open Google")
   const siteMatch = command.match(
-    /^(?:(?:please|can you|could you) )?(?:open|launch|go to|visit|navigate to) (?:the )?(youtube|google)(?: (?:website|site|page))?$/,
+    /^(?:(?:please|can you|could you) )?(?:open|launch|go to|visit|navigate to) (?:the )?(youtube|google)(?: (?:website|site|page|app))?(?: (?:in a new tab|in new tab|in a new window|in new window|in a tab|in tab))?$/,
   );
 
   if (siteMatch) {
     const siteId = siteMatch[1];
+    const isNewTab = /new tab|new window|in a tab|in tab/.test(command) || true;
+    const tabSuffix = /new tab|new window/.test(command) ? ' in a new tab' : '';
     return {
       action: 'open_site',
       status: 'ready',
-      params: { siteId, url: ALLOWED_SITES[siteId] },
+      params: { siteId, url: ALLOWED_SITES[siteId], inNewTab: isNewTab },
       message: language === 'hi-IN'
         ? `${siteId === 'youtube' ? 'यूट्यूब' : 'गूगल'} खोला जा रहा है।`
         : language === 'te-IN'
           ? `${siteId === 'youtube' ? 'యూట్యూబ్' : 'గూగుల్'} తెరుస్తున్నాను.`
-          : `Opening ${siteId === 'youtube' ? 'YouTube' : 'Google'}.`,
+          : `Opening ${siteId === 'youtube' ? 'YouTube' : 'Google'}${tabSuffix}.`,
+    };
+  }
+
+  // 2. Unsupported hardware/system controls (e.g. keyboard backlight, brightness, volume)
+  const isHardwareCommand = [
+    /\b(?:keyboard backlight|backlight|screen brightness|brightness|volume up|volume down|mute volume|unmute volume|shut ?down|restart (?:laptop|computer|pc)|sleep mode)\b/i,
+    /\b(?:turn on|turn off|enable|disable|increase|decrease|adjust) (?:the |my )?(?:keyboard backlight|backlight|screen brightness|brightness|volume|laptop volume|fan speed)\b/i,
+  ].some((pattern) => pattern.test(command));
+
+  if (isHardwareCommand) {
+    return {
+      action: 'unsupported_hardware',
+      status: 'unsupported',
+      params: {},
+      message: 'I cannot control laptop hardware or system settings from the browser. For security, web applications cannot adjust physical settings like keyboard backlighting or brightness.',
+    };
+  }
+
+  // 3. Unsupported / unallowlisted website navigation
+  const unallowlistedSiteMatch = command.match(
+    /^(?:(?:please|can you|could you) )?(?:open|launch|go to|visit|navigate to) (?:the )?([a-z0-9_-]+)(?: (?:website|site|page|app))?(?: (?:in a new tab|in new tab|in a new window|in new window))?$/,
+  );
+
+  if (unallowlistedSiteMatch && !['camera', 'webcam', 'mic', 'microphone', 'image', 'photo', 'text', 'it', 'this', 'that'].includes(unallowlistedSiteMatch[1])) {
+    const siteName = unallowlistedSiteMatch[1];
+    return {
+      action: 'unsupported_site',
+      status: 'unsupported',
+      params: { requestedSite: siteName },
+      message: `I can only open allowlisted websites (YouTube and Google). Opening "${siteName}" is not permitted for security.`,
     };
   }
 
@@ -183,15 +216,58 @@ export function routeCommand(transcript, {
   };
 }
 
-/** Navigates in the current tab to a fixed, allowlisted website only. */
-export function openAllowedSite(siteId) {
+/**
+ * Opens a fixed, allowlisted website.
+ * Uses window.open with '_blank' and sets win.opener = null for reverse-tabnabbing protection.
+ * Returns whether the browser permitted or blocked the popup.
+ *
+ * @param {string} siteId
+ * @param {{ inNewTab?: boolean }} [options]
+ * @returns {{ success: boolean, popupBlocked: boolean, url: string }}
+ */
+export function openAllowedSite(siteId, { inNewTab = true } = {}) {
   if (!Object.hasOwn(ALLOWED_SITES, siteId)) {
     throw new Error('That website is not in the allowed list.');
   }
+  const url = ALLOWED_SITES[siteId];
+
+  if (inNewTab) {
+    if (typeof globalThis.window?.open !== 'function') {
+      throw new Error('Browser popup / window navigation is unavailable in this environment.');
+    }
+
+    let win;
+    try {
+      // NOTE: We do not pass 'noopener' in the features string to window.open() because browsers
+      // intentionally return null from window.open() when 'noopener' is set, which prevents
+      // detecting whether the popup actually opened or was blocked.
+      // Instead, we open with '_blank', verify the returned Window reference, and then
+      // immediately set win.opener = null to prevent reverse-tabnabbing security vulnerabilities.
+      win = globalThis.window.open(url, '_blank');
+    } catch (err) {
+      console.warn('window.open threw an error:', err);
+      return { success: false, popupBlocked: true, url };
+    }
+
+    // If the browser popup blocker intervened, win will be null, undefined, or immediately closed
+    if (!win || win.closed || typeof win.closed === 'undefined') {
+      return { success: false, popupBlocked: true, url };
+    }
+
+    // Sever the opener relationship to prevent reverse-tabnabbing security vulnerabilities
+    try {
+      win.opener = null;
+    } catch {
+      // Ignore if browser security policy already isolated or restricted opener manipulation
+    }
+
+    return { success: true, popupBlocked: false, url };
+  }
+
   if (!globalThis.window?.location?.assign) {
     throw new Error('Browser navigation is unavailable in this environment.');
   }
 
-  globalThis.window.location.assign(ALLOWED_SITES[siteId]);
-  return true;
+  globalThis.window.location.assign(url);
+  return { success: true, popupBlocked: false, url };
 }

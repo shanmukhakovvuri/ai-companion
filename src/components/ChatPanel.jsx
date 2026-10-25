@@ -5,18 +5,50 @@ import { useState, useEffect, useRef } from 'react';
  * 
  * Props:
  * - messages: Array of message objects [{ id, sender: 'user' | 'assistant', text, timestamp, label }]
+ * - onSendMessage: Callback invoked with trimmed user message string
+ * - isGenerating: Boolean indicating whether model download or text generation is active
+ * - chatStatus: Optional status message (e.g. 'Downloading chat model: 45%')
+ * - chatProgress: Optional integer percentage (0-100)
+ * - chatError: Optional error message string
  */
-export default function ChatPanel({ messages = [] }) {
+export default function ChatPanel({
+  messages = [],
+  onSendMessage,
+  isGenerating = false,
+  chatStatus = null,
+  chatProgress = null,
+  chatError = null,
+}) {
   const containerRef = useRef(null);
+  const textareaRef = useRef(null);
   const [inputText, setInputText] = useState('');
 
   useEffect(() => {
     if (containerRef.current) {
       containerRef.current.scrollTop = containerRef.current.scrollHeight;
     }
-  }, [messages]);
+  }, [messages, isGenerating, chatStatus]);
 
   const hasMessages = messages.length > 0;
+
+  const handleSubmit = (event) => {
+    if (event) event.preventDefault();
+    const trimmed = inputText.trim();
+    if (!trimmed || isGenerating) return;
+
+    if (typeof onSendMessage === 'function') {
+      onSendMessage(trimmed);
+      setInputText('');
+    }
+  };
+
+  const handleKeyDown = (event) => {
+    // Send on Enter without Shift; Shift+Enter creates a newline
+    if (event.key === 'Enter' && !event.shiftKey) {
+      event.preventDefault();
+      handleSubmit(event);
+    }
+  };
 
   return (
     <section className="chat-panel" aria-labelledby="chat-heading">
@@ -43,7 +75,7 @@ export default function ChatPanel({ messages = [] }) {
         {!hasMessages ? (
           <div className="chat-empty-state">
             <p className="chat-empty-text">
-              No messages yet. Start a conversation using the microphone.
+              No messages yet. Start a conversation using the microphone or type below.
             </p>
           </div>
         ) : (
@@ -61,43 +93,63 @@ export default function ChatPanel({ messages = [] }) {
             </article>
           ))
         )}
+
+        {isGenerating && (
+          <article
+            className="chat-message chat-message--assistant"
+            aria-live="polite"
+            aria-label="Companion is thinking"
+          >
+            <span className="message-sender">Companion</span>
+            <div className="message-bubble chat-generating-bubble">
+              {chatStatus || 'Generating response...'}
+              {typeof chatProgress === 'number' && ` (${chatProgress}%)`}
+            </div>
+          </article>
+        )}
       </div>
 
       <div className="chat-speech-status">
-        Speech output is available for responses.
+        {chatError ? (
+          <span style={{ color: 'var(--color-status-error, #f44336)' }}>{chatError}</span>
+        ) : (
+          'Speech output is available for responses.'
+        )}
       </div>
 
       <hr className="chat-divider" />
 
-      {/* Message input section (Preview only, awaiting Gemini integration) */}
-      <div className="chat-input-section">
+      {/* Message input section */}
+      <form className="chat-input-section" onSubmit={handleSubmit}>
         <label htmlFor="chat-text-input" className="chat-input-label">
           Or type your message
         </label>
         <textarea
+          ref={textareaRef}
           id="chat-text-input"
           className="chat-textarea"
           rows={3}
-          placeholder="Ask your companion..."
+          placeholder={isGenerating ? "Companion is generating a response..." : "Ask your companion a question or type a message..."}
           value={inputText}
           onChange={(event) => setInputText(event.target.value)}
-          aria-describedby="chat-preview-note"
+          onKeyDown={handleKeyDown}
+          disabled={isGenerating}
+          aria-describedby="chat-privacy-note"
         />
         <div className="chat-input-actions">
           <button
-            type="button"
+            type="submit"
             className="btn-send-message"
-            disabled
-            aria-disabled="true"
-            title="Message sending is preview-only until Gemini integration is connected"
+            disabled={isGenerating || !inputText.trim()}
+            aria-busy={isGenerating}
           >
-            Send message
+            {isGenerating ? 'Generating...' : 'Send message'}
           </button>
         </div>
-        <p id="chat-preview-note" className="chat-input-note">
-          Preview only · Connect to your existing chatbot
+        <p id="chat-privacy-note" className="chat-input-note">
+          On-device AI · 100% private in your browser · No API keys required
         </p>
-      </div>
+      </form>
     </section>
   );
 }
