@@ -1,11 +1,22 @@
-import React, { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 
 /**
  * CameraPanel: Accessible interface for image capture, upload, preview, and image action controls.
+ * Matches Framer reference design for "Images & documents".
  * 
  * Props:
  * - onImageChange: Callback invoked with the selected File object or null
  * - onStatusChange: Callback invoked with status descriptions for user feedback
+ * - onDescribe: Callback to describe image with vision model
+ * - onReadText: Callback to extract text with OCR
+ * - isDescribing: Boolean indicating vision processing
+ * - isReadingText: Boolean indicating OCR processing
+ * - isSpeaking: Boolean indicating speech synthesis playing
+ * - isPaused: Boolean indicating speech playback paused
+ * - onPauseReading: Callback to pause speech
+ * - zonResumeReading: Callback to resume speech
+ * - onStopReading: Callback to stop speech
+ * - statusText: Optional status text
  */
 export default function CameraPanel({
   onImageChange,
@@ -70,7 +81,7 @@ export default function CameraPanel({
     setValidationError(null);
 
     if (onImageChange) onImageChange(file);
-    if (onStatusChange) onStatusChange('Image selected. Click "Describe" to analyze with local AI.');
+    if (onStatusChange) onStatusChange('Image selected. Click "Describe" or "Read text" to analyze.');
   };
 
   const handleClearImage = () => {
@@ -132,15 +143,14 @@ export default function CameraPanel({
     <section className="camera-panel" aria-labelledby="camera-heading">
       <header className="camera-panel-header">
         <h2 id="camera-heading" className="camera-panel-title">
-          <svg className="camera-panel-title-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false">
-            <path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z" />
-            <circle cx="12" cy="13" r="3" />
-          </svg>
-          Scene & Document Reading
+          Images & documents
         </h2>
+        <p className="camera-panel-subtitle">
+          Understand a scene or hear printed text.
+        </p>
       </header>
 
-      {/* Validation Error Banner linked via aria-describedby and role="alert" */}
+      {/* Validation Error Banner */}
       {validationError && (
         <div id="camera-validation-error" className="camera-error-banner" role="alert">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false">
@@ -163,38 +173,29 @@ export default function CameraPanel({
         onChange={handleFileChange}
         aria-label="Upload an image or take a photo"
         aria-invalid={validationError ? 'true' : 'false'}
-        aria-describedby={validationError ? 'camera-validation-error camera-upload-hint' : 'camera-upload-hint'}
+        aria-describedby={validationError ? 'camera-validation-error' : undefined}
       />
 
-      {/* Upload Dropzone or Image Preview */}
+      {/* Image Preview or "No image selected" empty box */}
       {!previewUrl ? (
-        <label
-          htmlFor="camera-file-input"
-          className="upload-dropzone"
-          tabIndex={0}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' || e.key === ' ') {
-              e.preventDefault();
-              handleTriggerInput();
-            }
-          }}
+        <button
+          type="button"
+          className="camera-empty-box"
+          onClick={handleTriggerInput}
+          aria-label="No image selected. Select an image."
         >
-          <div className="upload-icon-wrapper" aria-hidden="true">
-            <svg className="upload-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false">
-              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-              <polyline points="17 8 12 3 7 8" />
-              <line x1="12" y1="3" x2="12" y2="15" />
+          <div className="empty-box-icon" aria-hidden="true">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" focusable="false">
+              <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+              <circle cx="8.5" cy="8.5" r="1.5" />
+              <polyline points="21 15 16 10 5 21" />
             </svg>
           </div>
-          <div>
-            <p className="upload-primary-text">
-              <span>Choose an image</span> or take a photo
-            </p>
-            <p id="camera-upload-hint" className="upload-secondary-text">
-              PNG, JPG, or WebP up to 10MB
-            </p>
-          </div>
-        </label>
+          <span className="empty-box-heading">No image selected</span>
+          <span className="empty-box-text">
+            Select an image in the connected application.
+          </span>
+        </button>
       ) : (
         <div className="preview-container">
           <div className="image-preview-wrapper">
@@ -205,52 +206,10 @@ export default function CameraPanel({
             />
           </div>
 
-          <div className="preview-controls">
-            <span className="preview-file-info" title={selectedFile?.name}>
+          <div className="preview-file-bar">
+            <span className="preview-file-name" title={selectedFile?.name}>
               {selectedFile?.name}
             </span>
-            <div style={{ display: 'flex', gap: '8px' }}>
-              <button
-                type="button"
-                className="btn-replace-image"
-                onClick={handleRotateImage}
-                aria-label="Rotate image 90 degrees clockwise"
-                title="Rotate image 90° clockwise"
-                disabled={isBusy}
-              >
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false">
-                  <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67" />
-                </svg>
-                Rotate
-              </button>
-              <button
-                type="button"
-                className="btn-replace-image"
-                onClick={handleTriggerInput}
-                aria-label="Replace current image"
-                disabled={isBusy}
-              >
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false">
-                  <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
-                  <circle cx="8.5" cy="8.5" r="1.5" />
-                  <polyline points="21 15 16 10 5 21" />
-                </svg>
-                Replace
-              </button>
-              <button
-                type="button"
-                className="btn-replace-image"
-                onClick={handleClearImage}
-                aria-label="Clear current image"
-                disabled={isBusy}
-              >
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false">
-                  <line x1="18" y1="6" x2="6" y2="18" />
-                  <line x1="6" y1="6" x2="18" y2="18" />
-                </svg>
-                Clear
-              </button>
-            </div>
           </div>
 
           {/* Optional Question Box */}
@@ -281,79 +240,90 @@ export default function CameraPanel({
         </div>
       )}
 
-      {/* Camera Action Buttons (Focusable with aria-disabled and visible explanations) */}
-      <div className="camera-actions-grid" role="group" aria-label="Visual AI actions">
-        <div>
-          <button
-            type="button"
-            className={`btn-camera-action ${canDescribe ? 'btn-camera-action--active' : ''}`}
-            aria-disabled={!canDescribe}
-            aria-busy={isDescribing}
-            aria-describedby="describe-explanation"
-            onClick={(e) => {
-              if (canDescribe && onDescribe) {
-                const trimmed = question.trim();
-                onDescribe(selectedFile, trimmed.length > 0 ? trimmed : 'Describe this image in detail.');
-              } else {
-                e.preventDefault();
-              }
-            }}
-          >
-            <span className="camera-action-label">
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false">
-                <circle cx="12" cy="12" r="10" />
-                <path d="M12 16v-4M12 8h.01" />
-              </svg>
-              {isDescribing ? 'Describing...' : 'Describe'}
-            </span>
-            <span className="camera-action-badge" aria-hidden="true">
-              {isDescribing ? 'Processing' : (hasImage ? 'Ready' : 'Requires image')}
-            </span>
-          </button>
-          <span id="describe-explanation" className="action-help-text">
-            {isDescribing
-              ? (statusText || 'Analyzing image with local AI...')
-              : (hasImage
-                  ? 'Describe this photo using local AI.'
-                  : 'Select or take a photo first to enable AI description.')}
-          </span>
-        </div>
+      {/* Main Select Image Button (full width) */}
+      <button
+        type="button"
+        className="btn-select-image"
+        onClick={handleTriggerInput}
+        disabled={isBusy}
+        aria-label="Select image file or take a photo"
+      >
+        Select image
+      </button>
 
-        <div>
-          <button
-            type="button"
-            className={`btn-camera-action ${canReadText ? 'btn-camera-action--active' : ''}`}
-            aria-disabled={!canReadText}
-            aria-busy={isReadingText}
-            aria-describedby="read-text-explanation"
-            onClick={(e) => {
-              if (canReadText && onReadText) {
-                onReadText(selectedFile);
-              } else {
-                e.preventDefault();
-              }
-            }}
-          >
-            <span className="camera-action-label">
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false">
-                <polyline points="4 7 4 4 20 4 20 7" />
-                <line x1="9" y1="20" x2="15" y2="20" />
-                <line x1="12" y1="4" x2="12" y2="20" />
-              </svg>
-              {isReadingText ? 'Reading...' : 'Read text'}
-            </span>
-            <span className="camera-action-badge" aria-hidden="true">
-              {isReadingText ? 'Processing' : (hasImage ? 'Ready' : 'Requires image')}
-            </span>
-          </button>
-          <span id="read-text-explanation" className="action-help-text">
-            {isReadingText
-              ? (statusText || 'Extracting text from image...')
-              : (hasImage
-                  ? 'Extract and read printed or written text from this photo.'
-                  : 'Select or take a photo first to read text.')}
-          </span>
-        </div>
+      {/* 3-Button Control Row: Rotate, Replace, Clear */}
+      <div className="camera-secondary-actions" role="group" aria-label="Image adjustment controls">
+        <button
+          type="button"
+          className="btn-image-action"
+          onClick={handleRotateImage}
+          disabled={!hasImage || isBusy}
+          aria-label="Rotate image 90 degrees clockwise"
+        >
+          Rotate
+        </button>
+        <button
+          type="button"
+          className="btn-image-action"
+          onClick={handleTriggerInput}
+          disabled={!hasImage || isBusy}
+          aria-label="Replace current image"
+        >
+          Replace
+        </button>
+        <button
+          type="button"
+          className="btn-image-action"
+          onClick={handleClearImage}
+          disabled={!hasImage || isBusy}
+          aria-label="Clear current image"
+        >
+          Clear
+        </button>
+      </div>
+
+      {/* 2-Button Primary Actions Row: Describe, Read text */}
+      <div className="camera-primary-actions" role="group" aria-label="Image AI analysis actions">
+        <button
+          type="button"
+          className={`btn-primary-action ${canDescribe ? 'btn-primary-action--enabled' : ''}`}
+          disabled={!canDescribe}
+          aria-busy={isDescribing}
+          title={statusText || undefined}
+          onClick={() => {
+            if (canDescribe && onDescribe) {
+              const trimmed = question.trim();
+              onDescribe(selectedFile, trimmed.length > 0 ? trimmed : 'Describe this image in detail.');
+            }
+          }}
+        >
+          {isDescribing ? 'Describing...' : 'Describe'}
+        </button>
+
+        <button
+          type="button"
+          className={`btn-primary-action ${canReadText ? 'btn-primary-action--enabled' : ''}`}
+          disabled={!canReadText}
+          aria-busy={isReadingText}
+          title={statusText || undefined}
+          onClick={() => {
+            if (canReadText && onReadText) {
+              onReadText(selectedFile);
+            }
+          }}
+        >
+          {isReadingText ? 'Reading...' : 'Read text'}
+        </button>
+      </div>
+
+      {/* Safety & guidance text */}
+      <div className="camera-safety-notes">
+        <p className="camera-hint-text">
+          Select an image to enable these actions.
+        </p>
+        <p className="camera-disclaimer-text">
+          AI descriptions may be inaccurate. Verify important details with a trusted source.
+        </p>
       </div>
 
       {/* Accessible Speech Playback Controls (Pause / Resume / Stop) */}

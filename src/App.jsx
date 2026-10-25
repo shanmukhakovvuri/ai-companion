@@ -419,42 +419,62 @@ export default function App() {
       <header className="app-header" role="banner">
         <div className="header-container">
           <div className="brand-section">
-            <div className="brand-icon" aria-hidden="true">
-              {/* Soundwave/spark brand mark */}
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false">
-                <path d="M12 2v20M17 5v14M7 8v8M22 10v4M2 10v4" />
-              </svg>
-            </div>
             <div className="brand-text">
-              {/* Single h1 for the entire page */}
-              <h1 className="brand-title">Personal AI <span>Companion</span></h1>
-              <p className="brand-subtitle">Your voice-first assistant</p>
+              <span className="brand-title">Personal AI Companion</span>
+              <p className="brand-subtitle">Your voice-first accessibility assistant</p>
             </div>
           </div>
 
-          {/* Plain availability indicator (NOT a live region to avoid duplicate screen-reader chatter) */}
-          <div className="header-availability" aria-hidden="true">
-            <span className="availability-dot" />
-            <span>Ready</span>
+          {/* Plain preview / connection status indicator */}
+          <div className="header-preview-status" aria-hidden="true">
+            Preview · Not connected
           </div>
         </div>
       </header>
 
       {/* Main Content Landmark */}
       <main id="main-content" className="app-main" tabIndex={-1}>
+        {/* Hero Introduction */}
+        <section className="hero-intro" aria-labelledby="hero-heading">
+          <h1 id="hero-heading" className="hero-title">
+            A little help. More independence.
+          </h1>
+          <p className="hero-subtitle">
+            Ask a question, explore an image, or read a document. Start with your voice.
+          </p>
+        </section>
+
         <div className="layout-grid">
           {/* 1. Voice Hero Section (DOM Order: First in main) */}
           <section className="voice-hero-card" aria-labelledby="voice-heading">
-            <h2 id="voice-heading" className="voice-hero-title">Voice Interaction</h2>
+            <div className="voice-card-mic-col">
+              <MicButton
+                onClick={handleMicClick}
+                label="Start speech recognition"
+                isListening={isListening}
+                disabled={isProcessingVoice || isDescribing || isReadingText}
+              />
+            </div>
 
-            <MicButton
-              onClick={handleMicClick}
-              label="Start speech recognition"
-              isListening={isListening}
-              disabled={isProcessingVoice || isDescribing || isReadingText}
-            />
+            <div className="voice-card-content-col">
+              <h2 id="voice-heading" className="voice-hero-title">
+                {isListening ? 'Listening now...' : 'Ready when you are'}
+              </h2>
+              <p className="voice-instruction">
+                {isListening ? 'Speak a command or ask a question.' : 'Start voice input, or use the message field below.'}
+              </p>
+              <p className="voice-subtext">
+                The microphone button starts and stops listening. Speech is handled by your browser.
+              </p>
+              {/* Exactly one polite status region on the page */}
+              <StatusBar
+                status={status}
+                isLoading={isDescribing || isReadingText || isProcessingVoice}
+                progress={progress}
+              />
+            </div>
 
-            <div className="voice-controls" role="group" aria-label="Voice settings and playback controls">
+            <div className="voice-card-controls-col" role="group" aria-label="Voice settings and playback controls">
               <div className="voice-language-control">
                 <label htmlFor="voice-language">Speech language</label>
                 <select
@@ -475,21 +495,9 @@ export default function App() {
                 disabled={!isSpeaking}
                 aria-label="Stop spoken response"
               >
-                Stop speaking
+                Stop speech
               </button>
             </div>
-
-            <div>
-              <p className="voice-instruction">{isListening ? 'Listening. Speak a command.' : 'Activate the microphone to speak.'}</p>
-              <p className="voice-subtext">The microphone button also stops listening. Speech is handled by your browser.</p>
-            </div>
-
-            {/* Exactly one polite status region on the page */}
-            <StatusBar
-              status={status}
-              isLoading={isDescribing || isReadingText || isProcessingVoice}
-              progress={progress}
-            />
           </section>
 
           {/* 2. Scene & Document Reading Section (DOM Order: Second in main) */}
@@ -517,9 +525,8 @@ export default function App() {
       <footer className="app-footer" role="contentinfo">
         <div className="footer-container">
           <p className="footer-note">
-            Personal AI Companion supports keyboard and screen-reader access. Voice input, OCR, and AI models run in your browser.
+            Personal AI Companion · University project / Interface preview
           </p>
-          <p className="footer-version">v0.1.0 • Foundation UI</p>
         </div>
       </footer>
     </div>
