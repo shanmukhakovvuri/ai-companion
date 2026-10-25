@@ -47,6 +47,10 @@ export default function App() {
   const [isProcessingVoice, setIsProcessingVoice] = useState(false);
   const currentOcrCacheRef = useRef(null);
 
+  // Webcam refs — CameraPanel writes into these so voice commands can access the camera
+  const captureFrameRef = useRef(null);
+  const isCameraActiveRef = useRef(false);
+
   useEffect(() => () => {
     stopSpeechRecognition();
     stopSpeechOutput();
@@ -101,20 +105,40 @@ export default function App() {
       setIsListening(false);
       setIsProcessingVoice(true);
 
+      // Check if either an uploaded image OR a live camera feed is available
+      const hasImageSource = Boolean(selectedImage) || isCameraActiveRef.current;
+
       const result = routeCommand(transcript, {
-        hasImage: Boolean(selectedImage),
+        hasImage: hasImageSource,
         visionAvailable: typeof describeImage === 'function',
         ocrAvailable: typeof readText === 'function',
         language: selectedLanguage,
       });
 
       if (result.action === 'describe_image' && result.status === 'ready') {
-        await handleDescribeImage(selectedImage, transcript);
+        // Use uploaded image if available; otherwise capture one frame from webcam
+        let imageToProcess = selectedImage;
+        if (!imageToProcess && isCameraActiveRef.current && captureFrameRef.current) {
+          imageToProcess = await captureFrameRef.current();
+        }
+        if (imageToProcess) {
+          await handleDescribeImage(imageToProcess, transcript);
+        } else {
+          setStatus('Could not capture a frame from the camera.');
+        }
         return;
       }
 
       if (result.action === 'read_text' && result.status === 'ready') {
-        await handleReadText(selectedImage);
+        let imageToProcess = selectedImage;
+        if (!imageToProcess && isCameraActiveRef.current && captureFrameRef.current) {
+          imageToProcess = await captureFrameRef.current();
+        }
+        if (imageToProcess) {
+          await handleReadText(imageToProcess);
+        } else {
+          setStatus('Could not capture a frame from the camera.');
+        }
         return;
       }
 
@@ -514,6 +538,8 @@ export default function App() {
             onResumeReading={handleResumeReading}
             onStopReading={handleStopReading}
             statusText={status}
+            captureFrameRef={captureFrameRef}
+            isCameraActiveRef={isCameraActiveRef}
           />
 
           {/* 3. Conversation Panel Section (DOM Order: Third in main) */}

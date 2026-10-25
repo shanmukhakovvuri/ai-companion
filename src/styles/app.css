@@ -1148,6 +1148,111 @@ html, body {
   line-height: 1.4;
 }
 
+/* ==========================================================================
+   Webcam Live Preview Styles
+   ========================================================================== */
+
+/* Container for the live webcam preview */
+.webcam-preview-container {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+/* Wrapper constrains video size and matches existing image-preview-wrapper styling */
+.webcam-preview-wrapper {
+  width: 100%;
+  height: 200px;
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  background-color: #0c0d0d;
+  border: 1px solid var(--color-primary-border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* The video element itself fills the wrapper without overflow */
+.webcam-preview-video {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+  background-color: #000;
+}
+
+/* Small label beneath the webcam preview */
+.webcam-preview-label {
+  font-size: 0.8125rem;
+  color: var(--color-primary);
+  margin: 0;
+  text-align: center;
+  font-weight: 600;
+}
+
+/* Webcam start/stop button container */
+.webcam-controls {
+  display: flex;
+  gap: 8px;
+}
+
+/* Shared button style for webcam controls */
+.btn-webcam-control {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 40px;
+  padding: 8px 14px;
+  border-radius: var(--radius-md);
+  font: inherit;
+  font-size: 0.875rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background-color var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast);
+}
+
+/* Start camera: primary accent style */
+.btn-webcam-start {
+  background-color: var(--color-primary-subtle);
+  border: 1px solid var(--color-primary-border);
+  color: var(--color-primary);
+}
+
+.btn-webcam-start:hover:not(:disabled) {
+  background-color: rgba(244, 211, 94, 0.18);
+  border-color: var(--color-primary);
+  color: var(--color-primary-hover);
+}
+
+.btn-webcam-start:focus-visible {
+  outline: 3px solid var(--color-primary) !important;
+  outline-offset: 2px !important;
+}
+
+.btn-webcam-start:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* Stop camera: subtle warning style */
+.btn-webcam-stop {
+  background-color: var(--color-status-error-bg);
+  border: 1px solid var(--color-status-error-border);
+  color: var(--color-status-error);
+}
+
+.btn-webcam-stop:hover {
+  background-color: rgba(239, 68, 68, 0.22);
+  border-color: var(--color-status-error);
+}
+
+.btn-webcam-stop:focus-visible {
+  outline: 3px solid var(--color-status-error) !important;
+  outline-offset: 2px !important;
+}
+
 /* Accessible Speech Controls Group */
 .speech-controls-group {
   display: flex;
