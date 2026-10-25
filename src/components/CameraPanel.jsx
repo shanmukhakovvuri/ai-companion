@@ -53,6 +53,9 @@ export default function CameraPanel({
   const [cameraError, setCameraError] = useState('');
   const videoRef = useRef(null);
   const streamRef = useRef(null);
+  const isMountedRef = useRef(true);
+  const cameraSessionIdRef = useRef(0);
+  const activeStartPromiseRef = useRef(null);
 
   const hasImage = Boolean(selectedFile);
   const isBusy = isDescribing || isReadingText;
@@ -95,6 +98,9 @@ export default function CameraPanel({
 
   // ── Stop the webcam and release all hardware tracks ──
   const stopCamera = useCallback(() => {
+    // Invalidate any pending or in-flight camera start requests
+    cameraSessionIdRef.current += 1;
+
     if (streamRef.current) {
       streamRef.current.getTracks().forEach((track) => {
         try {
@@ -274,76 +280,123 @@ export default function CameraPanel({
       if (activeTracks.length > 0) return true;
     }
 
-    setCameraError('');
-
-    // Check browser support
-    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-      const msg = 'Your browser does not support camera access. Try Chrome or Edge.';
-      setCameraError(msg);
-      throw new Error(msg);
+    // Prevent overlapping startCamera calls from acquiring multiple streams
+    if (activeStartPromiseRef.current) {
+      return activeStartPromiseRef.current;
     }
 
+    const startPromise = (async () => {
+      const sessionId = ++cameraSessionIdRef.current;
+      setCameraError('');
+
+      // Check browser support
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        const msg = 'Your browser does not support camera access. Try Chrome or Edge.';
+        setCameraError(msg);
+        throw new Error(msg);
+      }
+
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: 'environment' },
+          audio: false, // Never request microphone here
+        });
+
+        // If Stop Camera was clicked or component unmounted while getUserMedia was pending,
+        // immediately stop all returned tracks and do not activate the camera
+        if (sessionId !== cameraSessionIdRef.current || !isMountedRef.current) {
+          if (stream) {
+            stream.getTracks().forEach((t) => {
+              try {
+                t.stop();
+              } catch (err) {
+                console.warn('Error stopping discarded track:', err);
+              }
+            });
+          }
+          return false;
+        }
+
+        // 1. Verify that getUserMedia() returns a live stream with at least one live video track
+        if (!stream) {
+          throw new Error('No camera stream returned.');
+        }
+        const videoTracks = stream.getVideoTracks();
+        if (!videoTracks || videoTracks.length === 0) {
+          stream.getTracks().forEach((t) => t.stop());
+          throw new Error('No video tracks available in camera stream.');
+        }
+        const primaryTrack = videoTracks[0];
+        if (primaryTrack.readyState !== 'live' || !primaryTrack.enabled) {
+          stream.getTracks().forEach((t) => t.stop());
+          throw new Error('Camera video track is not live or enabled.');
+        }
+
+        // Auto-cleanup if track ends externally (e.g., unplugged or permissions revoked)
+        primaryTrack.onended = () => {
+          stopCamera();
+        };
+
+        // Re-check cancellation token before committing state
+        if (sessionId !== cameraSessionIdRef.current || !isMountedRef.current) {
+          stream.getTracks().forEach((t) => {
+            try {
+              t.stop();
+            } catch (err) {
+              console.warn('Error stopping discarded track:', err);
+            }
+          });
+          return false;
+        }
+
+        streamRef.current = stream;
+        setIsCameraActive(true);
+        if (isCameraActiveRef) {
+          isCameraActiveRef.current = true;
+        }
+
+        // 2. Attach stream to video element and play if already mounted
+        if (videoRef.current) {
+          await attachStreamToVideo(videoRef.current, stream);
+        }
+
+        if (onStatusChange) {
+          onStatusChange('Camera started. Say "Describe this image" or "Read text" to analyze the live view.');
+        }
+        return true;
+      } catch (err) {
+        // If this session was cancelled while getUserMedia was pending, do not treat as active error
+        if (sessionId !== cameraSessionIdRef.current || !isMountedRef.current) {
+          return false;
+        }
+
+        console.error('Camera access error:', err);
+        streamRef.current = null;
+        setIsCameraActive(false);
+        if (isCameraActiveRef) {
+          isCameraActiveRef.current = false;
+        }
+
+        let msg;
+        if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+          msg = 'Camera permission was denied. Please allow camera access in your browser settings.';
+        } else if (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError') {
+          msg = 'No camera was found on this device.';
+        } else if (err.name === 'NotReadableError' || err.name === 'TrackStartError') {
+          msg = 'Camera is in use by another application. Close it and try again.';
+        } else {
+          msg = `Could not start camera: ${err.message || 'Unknown error'}`;
+        }
+        setCameraError(msg);
+        throw new Error(msg);
+      }
+    })();
+
+    activeStartPromiseRef.current = startPromise;
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'environment' },
-        audio: false, // Never request microphone here
-      });
-
-      // 1. Verify that getUserMedia() returns a live stream with at least one live video track
-      if (!stream) {
-        throw new Error('No camera stream returned.');
-      }
-      const videoTracks = stream.getVideoTracks();
-      if (!videoTracks || videoTracks.length === 0) {
-        stream.getTracks().forEach((t) => t.stop());
-        throw new Error('No video tracks available in camera stream.');
-      }
-      const primaryTrack = videoTracks[0];
-      if (primaryTrack.readyState !== 'live' || !primaryTrack.enabled) {
-        stream.getTracks().forEach((t) => t.stop());
-        throw new Error('Camera video track is not live or enabled.');
-      }
-
-      // Auto-cleanup if track ends externally (e.g., unplugged or permissions revoked)
-      primaryTrack.onended = () => {
-        stopCamera();
-      };
-
-      streamRef.current = stream;
-      setIsCameraActive(true);
-      if (isCameraActiveRef) {
-        isCameraActiveRef.current = true;
-      }
-
-      // 2. Attach stream to video element and play if already mounted
-      if (videoRef.current) {
-        await attachStreamToVideo(videoRef.current, stream);
-      }
-
-      if (onStatusChange) {
-        onStatusChange('Camera started. Say "Describe this image" or "Read text" to analyze the live view.');
-      }
-      return true;
-    } catch (err) {
-      console.error('Camera access error:', err);
-      streamRef.current = null;
-      setIsCameraActive(false);
-      if (isCameraActiveRef) {
-        isCameraActiveRef.current = false;
-      }
-
-      let msg;
-      if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
-        msg = 'Camera permission was denied. Please allow camera access in your browser settings.';
-      } else if (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError') {
-        msg = 'No camera was found on this device.';
-      } else if (err.name === 'NotReadableError' || err.name === 'TrackStartError') {
-        msg = 'Camera is in use by another application. Close it and try again.';
-      } else {
-        msg = `Could not start camera: ${err.message || 'Unknown error'}`;
-      }
-      setCameraError(msg);
-      throw new Error(msg);
+      return await startPromise;
+    } finally {
+      activeStartPromiseRef.current = null;
     }
   }, [attachStreamToVideo, isCameraActiveRef, onStatusChange, stopCamera]);
 
@@ -356,7 +409,10 @@ export default function CameraPanel({
 
   // ── Cleanup on unmount ──
   useEffect(() => {
+    isMountedRef.current = true;
     return () => {
+      isMountedRef.current = false;
+      cameraSessionIdRef.current += 1;
       if (captureFrameRef) {
         captureFrameRef.current = null;
       }
