@@ -7,13 +7,17 @@ import React, { useState, useEffect, useRef } from 'react';
  * - onImageChange: Callback invoked with the selected File object or null
  * - onStatusChange: Callback invoked with status descriptions for user feedback
  */
+
 export default function CameraPanel({
   onImageChange,
   onStatusChange,
   onDescribe,
+  onReadText,
   isDescribing = false,
-  statusText = '',
+  isReadingText = false,
+  statusText = ''
 }) {
+
   const [selectedFile, setSelectedFile] = useState(null);
   const [previewUrl, setPreviewUrl] = useState(null);
   const [question, setQuestion] = useState('');
@@ -22,6 +26,7 @@ export default function CameraPanel({
 
   const hasImage = Boolean(selectedFile);
   const canDescribe = hasImage && !isDescribing;
+  const canReadText = hasImage && !isDescribing && !isReadingText;
 
   // Clean up object URLs to prevent memory leaks
   useEffect(() => {
@@ -257,29 +262,42 @@ export default function CameraPanel({
           </span>
         </div>
 
-        <div>
-          <button
-            type="button"
-            className="btn-camera-action"
-            aria-disabled="true"
-            aria-describedby="read-text-explanation"
-            onClick={(e) => e.preventDefault()}
-          >
-            <span className="camera-action-label">
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false">
-                <polyline points="4 7 4 4 20 4 20 7" />
-                <line x1="9" y1="20" x2="15" y2="20" />
-                <line x1="12" y1="4" x2="12" y2="20" />
-              </svg>
-              Read text
-            </span>
-            <span className="camera-action-badge" aria-hidden="true">Coming soon</span>
-          </button>
-          <span id="read-text-explanation" className="action-help-text">
-            Not available yet. OCR text reading is being prepared.
-          </span>
-        </div>
-      </div>
+        
+<div>
+  <button
+    type="button"
+    className={`btn-camera-action ${hasImage && !isReadingText && !isDescribing ? 'btn-camera-action--active' : ''}`}
+    aria-disabled={!hasImage || isReadingText || isDescribing}
+    aria-busy={isReadingText}
+    aria-describedby="read-text-explanation"
+    onClick={() => {
+      if (hasImage && !isReadingText && !isDescribing && onReadText) {
+        onReadText(selectedFile);
+      }
+    }}
+  >
+    <span className="camera-action-label">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false">
+        <polyline points="4 7 4 4 20 4 20 7" />
+        <line x1="9" y1="20" x2="15" y2="20" />
+        <line x1="12" y1="4" x2="12" y2="20" />
+      </svg>
+      Read text
+    </span>
+    <span className="camera-action-badge" aria-hidden="true">
+      {isReadingText ? 'Reading…' : (hasImage ? 'Ready' : 'Requires image')}
+    </span>
+  </button>
+  <span id="read-text-explanation" className="action-help-text">
+    {isReadingText
+      ? (statusText || 'Recognizing text from image…')
+      : (hasImage
+          ? 'Extract text from this photo and read it aloud.'
+          : 'Select or take a photo first to enable text reading.')}
+  </span>
+</div>
+</div>
     </section>
+
   );
 }

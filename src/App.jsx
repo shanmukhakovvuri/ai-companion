@@ -4,6 +4,7 @@ import CameraPanel from './components/CameraPanel';
 import ChatPanel from './components/ChatPanel';
 import StatusBar from './components/StatusBar';
 import { loadVision, describeImage, isVisionReady } from './ai/vision';
+import { readTextFromImage } from './ai/ocr';
 import { isSpeechRecognitionSupported, startSpeechRecognition, stopSpeechRecognition } from './voice/speechInput';
 import { speakText, stopSpeaking } from './voice/speechOutput';
 import { openAllowedSite, routeCommand } from './actions/commandRouter';
@@ -34,6 +35,7 @@ export default function App() {
   ));
   const [progress, setProgress] = useState(null);
   const [isDescribing, setIsDescribing] = useState(false);
+  const [isReadingText, setIsReadingText] = useState(false);
   const [messages, setMessages] = useState([]);
   const [selectedImage, setSelectedImage] = useState(null);
   const [selectedLanguage, setSelectedLanguage] = useState('en-IN');
@@ -197,6 +199,48 @@ export default function App() {
     }
   };
 
+  const handleReadText = async (imageFile) => {
+    const fileToProcess = imageFile || selectedImage;
+
+    if (!fileToProcess) {
+      setStatus('Please select or capture an image first.');
+      return;
+    }
+
+    if (isReadingText || isDescribing || isProcessingVoice) return;
+
+    stopSpeaking();
+    setIsSpeaking(false);
+    setIsReadingText(true);
+    setProgress(null);
+
+    addMessage('user', 'Read text from the selected image.');
+
+    try {
+      setStatus('Reading text from image...');
+
+      const extractedText = await readTextFromImage(fileToProcess, (percent) => {
+        setProgress(percent);
+        setStatus(`Recognizing text: ${percent}%`);
+      });
+
+      addMessage('assistant', extractedText);
+      setStatus('Text reading complete.');
+      setProgress(null);
+
+      await speakResponse(extractedText, 'Text reading complete.');
+    } catch (error) {
+      console.error('OCR error:', error);
+
+      const errorMessage = error.message || 'Could not read text from the image.';
+      setStatus(`Error: ${errorMessage}`);
+      addMessage('assistant', `Could not read text: ${errorMessage}`);
+    } finally {
+      setIsReadingText(false);
+      setProgress(null);
+    }
+  };
+
   return (
     <div className="app-root">
       {/* Skip to Main Content Link for Keyboard and Screen-Reader Users */}
@@ -283,12 +327,14 @@ export default function App() {
 
           {/* 2. Scene & Document Reading Section (DOM Order: Second in main) */}
           <CameraPanel
-            onImageChange={handleImageChange}
-            onStatusChange={handleStatusChange}
-            onDescribe={handleDescribeImage}
-            isDescribing={isDescribing}
-            statusText={status}
-          />
+  onImageChange={handleImageChange}
+  onStatusChange={handleStatusChange}
+  onDescribe={handleDescribeImage}
+  onReadText={handleReadText}
+  isDescribing={isDescribing}
+  isReadingText={isReadingText}
+  statusText={status}
+/>
 
           {/* 3. Conversation Panel Section (DOM Order: Third in main) */}
           <ChatPanel messages={messages} />
