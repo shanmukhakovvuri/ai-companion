@@ -468,6 +468,158 @@ html, body {
 }
 
 /* ==========================================================================
+   HandsFreeControl Component (Hands-Free Wake Word Assistant)
+   ========================================================================== */
+.handsfree-control-card {
+  width: 100%;
+  padding: 12px;
+  background-color: var(--color-bg-input);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-md);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  text-align: left;
+}
+
+.handsfree-header-row {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.handsfree-label-group {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.handsfree-title {
+  color: var(--color-text-primary);
+  font-size: 0.8125rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.handsfree-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 7px;
+  border-radius: var(--radius-full);
+  font-size: 0.6875rem;
+  font-weight: 700;
+  line-height: 1.2;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.handsfree-badge--off {
+  background-color: var(--color-bg-hover);
+  color: var(--color-text-muted);
+  border: 1px solid var(--color-border-subtle);
+}
+
+.handsfree-badge--starting {
+  background-color: var(--color-status-info-bg);
+  color: var(--color-status-info);
+  border: 1px solid var(--color-status-info-border);
+}
+
+.handsfree-badge--listening {
+  background-color: var(--color-primary-subtle);
+  color: var(--color-primary);
+  border: 1px solid var(--color-primary-border);
+}
+
+.handsfree-badge--command {
+  background-color: var(--color-status-ready-bg);
+  color: var(--color-status-ready);
+  border: 1px solid var(--color-status-ready-border);
+}
+
+.handsfree-badge--processing {
+  background-color: var(--color-status-info-bg);
+  color: var(--color-status-info);
+  border: 1px solid var(--color-status-info-border);
+}
+
+.handsfree-badge--error {
+  background-color: var(--color-status-error-bg);
+  color: var(--color-status-error);
+  border: 1px solid var(--color-status-error-border);
+}
+
+.handsfree-toggle-btn {
+  width: 100%;
+  height: 38px;
+  padding: 6px 12px;
+  background-color: var(--color-bg-subtle);
+  border: 1px solid var(--color-border-medium);
+  border-radius: var(--radius-md);
+  color: var(--color-text-primary);
+  font: inherit;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: background-color var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast);
+}
+
+.handsfree-toggle-btn:hover:not(:disabled) {
+  background-color: var(--color-bg-hover);
+  border-color: var(--color-border-strong);
+  color: #ffffff;
+}
+
+.handsfree-toggle-btn:focus-visible {
+  outline: 3px solid #ffffff !important;
+  outline-offset: 2px !important;
+}
+
+.handsfree-toggle-btn--active {
+  background-color: var(--color-primary-subtle);
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+}
+
+.handsfree-toggle-btn--active:hover:not(:disabled) {
+  background-color: rgba(244, 211, 94, 0.2);
+  border-color: var(--color-primary-hover);
+  color: var(--color-primary-hover);
+}
+
+.handsfree-toggle-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.handsfree-icon {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+}
+
+.handsfree-hint {
+  font-size: 0.6875rem;
+  color: var(--color-text-muted);
+  line-height: 1.35;
+  margin: 0;
+}
+
+.handsfree-error-alert {
+  font-size: 0.6875rem;
+  color: var(--color-status-error);
+  line-height: 1.35;
+  margin: 0;
+}
+
+
+/* ==========================================================================
    MicButton Component (Warm Yellow Circular Button)
    ========================================================================== */
 .mic-button-wrapper {
@@ -1146,6 +1298,111 @@ html, body {
   color: var(--color-text-muted);
   margin: 0;
   line-height: 1.4;
+}
+
+/* ==========================================================================
+   Webcam Live Preview Styles
+   ========================================================================== */
+
+/* Container for the live webcam preview */
+.webcam-preview-container {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+/* Wrapper constrains video size and matches existing image-preview-wrapper styling */
+.webcam-preview-wrapper {
+  width: 100%;
+  height: 200px;
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  background-color: #0c0d0d;
+  border: 1px solid var(--color-primary-border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* The video element itself fills the wrapper without overflow */
+.webcam-preview-video {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+  background-color: #000;
+}
+
+/* Small label beneath the webcam preview */
+.webcam-preview-label {
+  font-size: 0.8125rem;
+  color: var(--color-primary);
+  margin: 0;
+  text-align: center;
+  font-weight: 600;
+}
+
+/* Webcam start/stop button container */
+.webcam-controls {
+  display: flex;
+  gap: 8px;
+}
+
+/* Shared button style for webcam controls */
+.btn-webcam-control {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 40px;
+  padding: 8px 14px;
+  border-radius: var(--radius-md);
+  font: inherit;
+  font-size: 0.875rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background-color var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast);
+}
+
+/* Start camera: primary accent style */
+.btn-webcam-start {
+  background-color: var(--color-primary-subtle);
+  border: 1px solid var(--color-primary-border);
+  color: var(--color-primary);
+}
+
+.btn-webcam-start:hover:not(:disabled) {
+  background-color: rgba(244, 211, 94, 0.18);
+  border-color: var(--color-primary);
+  color: var(--color-primary-hover);
+}
+
+.btn-webcam-start:focus-visible {
+  outline: 3px solid var(--color-primary) !important;
+  outline-offset: 2px !important;
+}
+
+.btn-webcam-start:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* Stop camera: subtle warning style */
+.btn-webcam-stop {
+  background-color: var(--color-status-error-bg);
+  border: 1px solid var(--color-status-error-border);
+  color: var(--color-status-error);
+}
+
+.btn-webcam-stop:hover {
+  background-color: rgba(239, 68, 68, 0.22);
+  border-color: var(--color-status-error);
+}
+
+.btn-webcam-stop:focus-visible {
+  outline: 3px solid var(--color-status-error) !important;
+  outline-offset: 2px !important;
 }
 
 /* Accessible Speech Controls Group */

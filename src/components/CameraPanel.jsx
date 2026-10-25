@@ -1,9 +1,10 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 
 /**
- * CameraPanel: Accessible interface for image capture, upload, preview, and image action controls.
+ * CameraPanel: Accessible interface for image capture, upload, webcam preview,
+ * and image action controls.
  * Matches Framer reference design for "Images & documents".
- * 
+ *
  * Props:
  * - onImageChange: Callback invoked with the selected File object or null
  * - onStatusChange: Callback invoked with status descriptions for user feedback
@@ -14,9 +15,15 @@ import { useState, useEffect, useRef } from 'react';
  * - isSpeaking: Boolean indicating speech synthesis playing
  * - isPaused: Boolean indicating speech playback paused
  * - onPauseReading: Callback to pause speech
- * - zonResumeReading: Callback to resume speech
+ * - onResumeReading: Callback to resume speech
  * - onStopReading: Callback to stop speech
  * - statusText: Optional status text
+ * - captureFrameRef: A React ref — CameraPanel writes a captureFrame() function
+ *   into it so the parent can capture a single frame from the live webcam.
+ * - isCameraActiveRef: A React ref — CameraPanel writes the current camera-active
+ *   boolean into it so the parent can check without causing re-renders.
+ * - startCameraRef: A React ref — CameraPanel writes the startCamera() async function
+ *   into it so the parent can trigger camera activation programmatically.
  */
 export default function CameraPanel({
   onImageChange,
@@ -31,6 +38,9 @@ export default function CameraPanel({
   onResumeReading,
   onStopReading,
   statusText = '',
+  captureFrameRef,
+  isCameraActiveRef,
+  startCameraRef,
 }) {
   const [selectedFile, setSelectedFile] = useState(null);
   const [previewUrl, setPreviewUrl] = useState(null);
@@ -38,10 +48,327 @@ export default function CameraPanel({
   const [validationError, setValidationError] = useState(null);
   const fileInputRef = useRef(null);
 
+  // ── Webcam state ──
+  const [isCameraActive, setIsCameraActive] = useState(false);
+  const [cameraError, setCameraError] = useState('');
+  const videoRef = useRef(null);
+  const streamRef = useRef(null);
+
   const hasImage = Boolean(selectedFile);
   const isBusy = isDescribing || isReadingText;
-  const canDescribe = hasImage && !isBusy;
-  const canReadText = hasImage && !isBusy;
+  const canDescribe = (hasImage || isCameraActive) && !isBusy;
+  const canReadText = (hasImage || isCameraActive) && !isBusy;
+
+  // ── Keep parent's isCameraActiveRef in sync ──
+  useEffect(() => {
+    if (isCameraActiveRef) {
+      isCameraActiveRef.current = isCameraActive;
+    }
+  }, [isCameraActive, isCameraActiveRef]);
+
+  // ── Helper to attach stream and initiate video playback ──
+  const attachStreamToVideo = useCallback(async (videoEl, stream) => {
+    if (!videoEl || !stream) return;
+    try {
+      if (videoEl.srcObject !== stream) {
+        videoEl.srcObject = stream;
+      }
+      videoEl.muted = true;
+      videoEl.playsInline = true;
+      const playPromise = videoEl.play();
+      if (playPromise !== undefined) {
+        await playPromise;
+      }
+    } catch (err) {
+      if (err.name !== 'AbortError') {
+        console.warn('Video playback start error:', err);
+      }
+    }
+  }, []);
+
+  // ── Keep stream attached and playing when camera is active ──
+  useEffect(() => {
+    if (isCameraActive && videoRef.current && streamRef.current) {
+      attachStreamToVideo(videoRef.current, streamRef.current);
+    }
+  }, [isCameraActive, attachStreamToVideo]);
+
+  // ── Stop the webcam and release all hardware tracks ──
+  const stopCamera = useCallback(() => {
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((track) => {
+        try {
+          track.stop();
+        } catch (err) {
+          console.warn('Error stopping video track:', err);
+        }
+      });
+      streamRef.current = null;
+    }
+    if (videoRef.current) {
+      videoRef.current.srcObject = null;
+    }
+    setIsCameraActive(false);
+    if (isCameraActiveRef) {
+      isCameraActiveRef.current = false;
+    }
+    setCameraError('');
+
+    if (onStatusChange) {
+      onStatusChange('Camera stopped.');
+    }
+  }, [isCameraActiveRef, onStatusChange]);
+
+  // ── Wait for video element and stream to be ready with usable dimensions ──
+  const waitForVideoReady = useCallback((timeoutMs = 4000) => {
+    return new Promise((resolve) => {
+      const video = videoRef.current;
+      const stream = streamRef.current;
+
+      if (!stream) {
+        resolve(false);
+        return;
+      }
+
+      if (video) {
+        if (video.srcObject !== stream) {
+          video.srcObject = stream;
+        }
+        if (video.paused) {
+          video.play().catch((err) => {
+            if (err.name !== 'AbortError') console.warn('Video play error during wait:', err);
+          });
+        }
+        if (video.readyState >= 2 && video.videoWidth > 0 && video.videoHeight > 0) {
+          resolve(true);
+          return;
+        }
+      }
+
+      const startTime = performance.now();
+      let frameId = null;
+
+      const check = () => {
+        const v = videoRef.current;
+        if (v && streamRef.current) {
+          if (v.srcObject !== streamRef.current) {
+            v.srcObject = streamRef.current;
+          }
+          if (v.paused) {
+            v.play().catch(() => {});
+          }
+          if (v.readyState >= 2 && v.videoWidth > 0 && v.videoHeight > 0) {
+            cleanup();
+            resolve(true);
+            return;
+          }
+        }
+
+        if (performance.now() - startTime >= timeoutMs) {
+          cleanup();
+          resolve(false);
+          return;
+        }
+
+        frameId = requestAnimationFrame(check);
+      };
+
+      const onMeta = () => {
+        const v = videoRef.current;
+        if (v && v.paused) {
+          v.play().catch(() => {});
+        }
+      };
+
+      const cleanup = () => {
+        if (frameId) cancelAnimationFrame(frameId);
+        if (videoRef.current) {
+          videoRef.current.removeEventListener('loadedmetadata', onMeta);
+        }
+      };
+
+      if (videoRef.current) {
+        videoRef.current.addEventListener('loadedmetadata', onMeta, { once: true });
+      }
+      frameId = requestAnimationFrame(check);
+    });
+  }, []);
+
+  // ── Capture a single frame from the live webcam ──
+  const captureFrame = useCallback(async () => {
+    const stream = streamRef.current;
+    if (!stream) {
+      if (onStatusChange) {
+        onStatusChange('Cannot capture frame: camera is not started.');
+      }
+      return null;
+    }
+
+    // Wait for video element and stream to be ready with usable dimensions
+    const isReady = await waitForVideoReady(4000);
+    const video = videoRef.current;
+
+    // Check readyState, videoWidth, and videoHeight immediately before drawing the frame
+    if (
+      !isReady ||
+      !video ||
+      video.readyState < 2 ||
+      video.videoWidth <= 0 ||
+      video.videoHeight <= 0
+    ) {
+      console.warn('Video frame not ready for capture');
+      if (onStatusChange) {
+        onStatusChange('Could not capture frame: camera preview is not ready.');
+      }
+      return null;
+    }
+
+    const canvas = document.createElement('canvas');
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) {
+      if (onStatusChange) {
+        onStatusChange('Could not create canvas context for camera capture.');
+      }
+      return null;
+    }
+
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+    return new Promise((resolve) => {
+      canvas.toBlob(
+        (blob) => {
+          if (blob && blob.size > 0) {
+            const frameFile = new File([blob], 'webcam-frame.jpg', {
+              type: 'image/jpeg',
+              lastModified: Date.now(),
+            });
+            resolve(frameFile);
+          } else {
+            console.warn('Canvas toBlob generated an empty frame');
+            if (onStatusChange) {
+              onStatusChange('Could not capture frame from camera.');
+            }
+            resolve(null);
+          }
+        },
+        'image/jpeg',
+        0.92
+      );
+    });
+  }, [waitForVideoReady, onStatusChange]);
+
+  // ── Expose captureFrame to parent via ref ──
+  useEffect(() => {
+    if (captureFrameRef) {
+      captureFrameRef.current = captureFrame;
+    }
+  }, [captureFrame, captureFrameRef]);
+
+  // ── Start the webcam ──
+  const startCamera = useCallback(async () => {
+    // Prevent duplicates if already active with a live track
+    if (streamRef.current && streamRef.current.active) {
+      const activeTracks = streamRef.current.getVideoTracks().filter((t) => t.readyState === 'live');
+      if (activeTracks.length > 0) return true;
+    }
+
+    setCameraError('');
+
+    // Check browser support
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      const msg = 'Your browser does not support camera access. Try Chrome or Edge.';
+      setCameraError(msg);
+      throw new Error(msg);
+    }
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: 'environment' },
+        audio: false, // Never request microphone here
+      });
+
+      // 1. Verify that getUserMedia() returns a live stream with at least one live video track
+      if (!stream) {
+        throw new Error('No camera stream returned.');
+      }
+      const videoTracks = stream.getVideoTracks();
+      if (!videoTracks || videoTracks.length === 0) {
+        stream.getTracks().forEach((t) => t.stop());
+        throw new Error('No video tracks available in camera stream.');
+      }
+      const primaryTrack = videoTracks[0];
+      if (primaryTrack.readyState !== 'live' || !primaryTrack.enabled) {
+        stream.getTracks().forEach((t) => t.stop());
+        throw new Error('Camera video track is not live or enabled.');
+      }
+
+      // Auto-cleanup if track ends externally (e.g., unplugged or permissions revoked)
+      primaryTrack.onended = () => {
+        stopCamera();
+      };
+
+      streamRef.current = stream;
+      setIsCameraActive(true);
+      if (isCameraActiveRef) {
+        isCameraActiveRef.current = true;
+      }
+
+      // 2. Attach stream to video element and play if already mounted
+      if (videoRef.current) {
+        await attachStreamToVideo(videoRef.current, stream);
+      }
+
+      if (onStatusChange) {
+        onStatusChange('Camera started. Say "Describe this image" or "Read text" to analyze the live view.');
+      }
+      return true;
+    } catch (err) {
+      console.error('Camera access error:', err);
+      streamRef.current = null;
+      setIsCameraActive(false);
+      if (isCameraActiveRef) {
+        isCameraActiveRef.current = false;
+      }
+
+      let msg;
+      if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+        msg = 'Camera permission was denied. Please allow camera access in your browser settings.';
+      } else if (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError') {
+        msg = 'No camera was found on this device.';
+      } else if (err.name === 'NotReadableError' || err.name === 'TrackStartError') {
+        msg = 'Camera is in use by another application. Close it and try again.';
+      } else {
+        msg = `Could not start camera: ${err.message || 'Unknown error'}`;
+      }
+      setCameraError(msg);
+      throw new Error(msg);
+    }
+  }, [attachStreamToVideo, isCameraActiveRef, onStatusChange, stopCamera]);
+
+  // ── Expose startCamera to parent via ref ──
+  useEffect(() => {
+    if (startCameraRef) {
+      startCameraRef.current = startCamera;
+    }
+  }, [startCamera, startCameraRef]);
+
+  // ── Cleanup on unmount ──
+  useEffect(() => {
+    return () => {
+      if (captureFrameRef) {
+        captureFrameRef.current = null;
+      }
+      if (startCameraRef) {
+        startCameraRef.current = null;
+      }
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach((track) => track.stop());
+        streamRef.current = null;
+      }
+    };
+  }, [captureFrameRef, startCameraRef]);
 
   // Clean up object URLs to prevent memory leaks
   useEffect(() => {
@@ -139,6 +466,42 @@ export default function CameraPanel({
     fileInputRef.current?.click();
   };
 
+  // ── Handle Describe button with webcam fallback ──
+  const handleDescribeClick = async () => {
+    if (isBusy || !onDescribe) return;
+
+    const trimmed = question.trim();
+    const prompt = trimmed.length > 0 ? trimmed : 'Describe this image in detail.';
+
+    // Prefer uploaded image; fall back to webcam frame
+    if (selectedFile) {
+      onDescribe(selectedFile, prompt);
+    } else if (isCameraActive) {
+      const frame = await captureFrame();
+      if (frame) {
+        onDescribe(frame, prompt);
+      } else if (onStatusChange) {
+        onStatusChange('Could not capture a frame from the camera. Make sure the camera is running.');
+      }
+    }
+  };
+
+  // ── Handle Read Text button with webcam fallback ──
+  const handleReadTextClick = async () => {
+    if (isBusy || !onReadText) return;
+
+    if (selectedFile) {
+      onReadText(selectedFile);
+    } else if (isCameraActive) {
+      const frame = await captureFrame();
+      if (frame) {
+        onReadText(frame);
+      } else if (onStatusChange) {
+        onStatusChange('Could not capture a frame from the camera. Make sure the camera is running.');
+      }
+    }
+  };
+
   return (
     <section className="camera-panel" aria-labelledby="camera-heading">
       <header className="camera-panel-header">
@@ -162,6 +525,71 @@ export default function CameraPanel({
         </div>
       )}
 
+      {/* Camera Error Banner */}
+      {cameraError && (
+        <div className="camera-error-banner" role="alert">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false">
+            <circle cx="12" cy="12" r="10" />
+            <line x1="12" y1="8" x2="12" y2="12" />
+            <line x1="12" y1="16" x2="12.01" y2="16" />
+          </svg>
+          <span>{cameraError}</span>
+        </div>
+      )}
+
+      {/* ── Live Webcam Preview ── */}
+      {isCameraActive && (
+        <div className="webcam-preview-container">
+          <div className="webcam-preview-wrapper">
+            <video
+              ref={(el) => {
+                videoRef.current = el;
+                if (el && streamRef.current && isCameraActive) {
+                  attachStreamToVideo(el, streamRef.current);
+                }
+              }}
+              className="webcam-preview-video"
+              autoPlay
+              playsInline
+              muted
+              aria-label="Live webcam preview"
+            />
+          </div>
+          <p className="webcam-preview-label">Live camera preview</p>
+        </div>
+      )}
+
+      {/* Webcam Start / Stop Controls */}
+      <div className="webcam-controls" role="group" aria-label="Webcam controls">
+        {!isCameraActive ? (
+          <button
+            type="button"
+            className="btn-webcam-control btn-webcam-start"
+            onClick={startCamera}
+            disabled={isBusy}
+            aria-label="Start live camera preview"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false">
+              <path d="M23 7l-7 5 7 5V7z" />
+              <rect x="1" y="5" width="15" height="14" rx="2" ry="2" />
+            </svg>
+            Start camera
+          </button>
+        ) : (
+          <button
+            type="button"
+            className="btn-webcam-control btn-webcam-stop"
+            onClick={stopCamera}
+            aria-label="Stop live camera and release resources"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false">
+              <rect x="6" y="6" width="12" height="12" rx="2" />
+            </svg>
+            Stop camera
+          </button>
+        )}
+      </div>
+
       {/* Accessible File Input */}
       <input
         ref={fileInputRef}
@@ -178,24 +606,26 @@ export default function CameraPanel({
 
       {/* Image Preview or "No image selected" empty box */}
       {!previewUrl ? (
-        <button
-          type="button"
-          className="camera-empty-box"
-          onClick={handleTriggerInput}
-          aria-label="No image selected. Select an image."
-        >
-          <div className="empty-box-icon" aria-hidden="true">
-            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" focusable="false">
-              <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
-              <circle cx="8.5" cy="8.5" r="1.5" />
-              <polyline points="21 15 16 10 5 21" />
-            </svg>
-          </div>
-          <span className="empty-box-heading">No image selected</span>
-          <span className="empty-box-text">
-            Select an image in the connected application.
-          </span>
-        </button>
+        !isCameraActive && (
+          <button
+            type="button"
+            className="camera-empty-box"
+            onClick={handleTriggerInput}
+            aria-label="No image selected. Select an image."
+          >
+            <div className="empty-box-icon" aria-hidden="true">
+              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" focusable="false">
+                <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+                <circle cx="8.5" cy="8.5" r="1.5" />
+                <polyline points="21 15 16 10 5 21" />
+              </svg>
+            </div>
+            <span className="empty-box-heading">No image selected</span>
+            <span className="empty-box-text">
+              Select an image or start the camera.
+            </span>
+          </button>
+        )
       ) : (
         <div className="preview-container">
           <div className="image-preview-wrapper">
@@ -290,12 +720,7 @@ export default function CameraPanel({
           disabled={!canDescribe}
           aria-busy={isDescribing}
           title={statusText || undefined}
-          onClick={() => {
-            if (canDescribe && onDescribe) {
-              const trimmed = question.trim();
-              onDescribe(selectedFile, trimmed.length > 0 ? trimmed : 'Describe this image in detail.');
-            }
-          }}
+          onClick={handleDescribeClick}
         >
           {isDescribing ? 'Describing...' : 'Describe'}
         </button>
@@ -306,11 +731,7 @@ export default function CameraPanel({
           disabled={!canReadText}
           aria-busy={isReadingText}
           title={statusText || undefined}
-          onClick={() => {
-            if (canReadText && onReadText) {
-              onReadText(selectedFile);
-            }
-          }}
+          onClick={handleReadTextClick}
         >
           {isReadingText ? 'Reading...' : 'Read text'}
         </button>
@@ -319,7 +740,7 @@ export default function CameraPanel({
       {/* Safety & guidance text */}
       <div className="camera-safety-notes">
         <p className="camera-hint-text">
-          Select an image to enable these actions.
+          Select an image or start the camera to enable these actions.
         </p>
         <p className="camera-disclaimer-text">
           AI descriptions may be inaccurate. Verify important details with a trusted source.
@@ -372,3 +793,4 @@ export default function CameraPanel({
     </section>
   );
 }
+
