@@ -202,11 +202,20 @@ export async function generateChat(userPrompt, conversationHistory = [], options
     await loadChat();
   }
 
+
   // Build standard chat template messages
   const systemMessage = {
     role: 'system',
-    content: 'You are a friendly, helpful, and concise Personal AI Companion. Answer questions directly, kindly, and informatively.',
+    content:
+      'You are a helpful Personal AI Companion. ' +
+      'Answer the user’s exact question directly using simple, clear language. ' +
+      'Stay focused on the topic and do not add unrelated examples, stories, or extra claims. ' +
+      'For comparison questions, explain the main differences in a short, organized format. ' +
+      'For calculations, give the correct result and a brief explanation when useful. ' +
+      'If you do not know something, say so instead of guessing. ' +
+      'Keep answers concise and stop when the question has been answered.',
   };
+
 
   // Convert previous history into user/assistant turns (keep last 8 turns for responsive inference)
   const historyTurns = (conversationHistory || [])
